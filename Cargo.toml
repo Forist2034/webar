@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["./data/derive-rs", "./data/data-rs"]
+
+
+[workspace.package]
+license = "AGPL-3.0-or-later"
+
+[workspace.dependencies]
+serde = { version = "1.0.200", features = ["derive"] }
+serde_json = { version = "1.0.116", features = [
+  "arbitrary_precision",
+  "preserve_order",
+] }
+ciborium = "0.2.2"
+uuid = { version = "1.8.0", features = ["serde"] }
+hex-literal = "0.4.1"
+# projects
+webar-data = { path = "./data/data-rs" }

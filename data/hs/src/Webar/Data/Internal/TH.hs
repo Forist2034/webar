@@ -1,0 +1,338 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+
+module Webar.Data.Internal.TH
+  ( ProductOptions (..),
+    SumOptions (..),
+    camelTo2,
+    Serializer (..),
+    mkSerializeProd,
+    mkSerializeSum,
+    ConInfo (ciType, ciCon),
+    TagExp (..),
+    SizeExp (..),
+    Deserializer (..),
+    mkDeserializeProd,
+    mkDeserializeSum,
+  )
+where
+
+import Data.Aeson (camelTo2)
+import Data.Foldable
+import qualified Data.List as L
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NEL
+import Data.Text (Text)
+import qualified Data.Text as T
+import Language.Haskell.TH
+import Language.Haskell.TH.Syntax
+
+newtype ProductOptions = ProductOptions
+  { fieldLabelModifier :: String -> String
+  }
+
+data SumOptions = SumOptions
+  { constructorTagModifier :: String -> String,
+    sumProduct :: ProductOptions
+  }
+
+data Serializer = Serializer
+  { serField :: Exp -> ExpQ,
+    serNamedField :: Text -> Exp -> ExpQ,
+    -- | single normal constructor
+    serNormalProd :: NonEmpty Exp -> ExpQ,
+    -- | single record constructor
+    serRecProd :: NonEmpty Exp -> ExpQ,
+    serUnitSum :: Text -> ExpQ,
+    serUnarySum :: Text -> Exp -> ExpQ,
+    serNormalSum :: Text -> NonEmpty Exp -> ExpQ,
+    serRecSum :: Text -> NonEmpty Exp -> ExpQ
+  }
+
+-- constructor with no field is not supported because not sure what to do
+
+mkNormalEncoder :: Serializer -> Name -> NonEmpty BangType -> Q (Pat, NonEmpty Exp)
+mkNormalEncoder ser cn cs = do
+  (pats, exprs) <-
+    NEL.unzip
+      <$> traverse
+        ( \_ -> do
+            fn <- newName "f"
+            expr <- serField ser (VarE fn)
+            pure (VarP fn, expr)
+        )
+        cs
+  pure (ConP cn [] (NEL.toList pats), exprs)
+
+sortRecFields :: ProductOptions -> [VarBangType] -> [(Text, Name)]
+sortRecFields opt fs =
+  L.sortOn
+    fst
+    ( fmap
+        ( \(n@(Name (OccName ns) _), _, _) ->
+            (T.pack (fieldLabelModifier opt ns), n)
+        )
+        fs
+    )
+
+mkRecordEncoder :: Serializer -> ProductOptions -> Name -> [VarBangType] -> Q (Pat, NonEmpty Exp)
+mkRecordEncoder ser opt cn fs = do
+  (pats, exprs) <-
+    unzip
+      <$> traverse
+        ( \(serName, fieldName) -> do
+            field <- newName "f"
+            expr <- serNamedField ser serName (VarE field)
+            pure ((fieldName, VarP field), expr)
+        )
+        (sortRecFields opt fs)
+  pure (RecP cn pats, NEL.fromList exprs)
+
+productToSerialize :: Serializer -> ProductOptions -> Con -> ExpQ
+productToSerialize _ _ (NormalC _ []) = error "empty constructor is not supported"
+productToSerialize ser _ (NormalC cn (h : t)) = do
+  (pat, exprs) <- mkNormalEncoder ser cn (h :| t)
+  body <- serNormalProd ser exprs
+  pure (LamE [pat] body)
+productToSerialize _ _ (RecC _ []) = error "empty record is not supported"
+productToSerialize ser opt (RecC cn fs) = do
+  (pat, exprs) <- mkRecordEncoder ser opt cn fs
+  body <- serRecProd ser exprs
+  pure (LamE [pat] body)
+productToSerialize _ _ _ = error "Unsupported constructor"
+
+serializedSum :: SumOptions -> Name -> String
+serializedSum opt (Name (OccName cns) _) = constructorTagModifier opt cns
+
+serializedSumTxt :: SumOptions -> Name -> Text
+serializedSumTxt opt n = T.pack (serializedSum opt n)
+
+sumToSerialize :: Serializer -> SumOptions -> [Con] -> ExpQ
+sumToSerialize ser opt cs = do
+  v <- newName "v"
+  matches <-
+    traverse
+      ( \case
+          NormalC cn [] -> do
+            body <- serUnitSum ser (serializedSumTxt opt cn)
+            pure (Match (ConP cn [] []) (NormalB body) [])
+          NormalC cn [_] -> do
+            fn <- newName "f"
+            body <- serUnarySum ser (serializedSumTxt opt cn) (VarE fn)
+            pure (Match (ConP cn [] [VarP fn]) (NormalB body) [])
+          NormalC cn (h : t) -> do
+            (pat, exprs) <- mkNormalEncoder ser cn (h :| t)
+            body <- serNormalSum ser (serializedSumTxt opt cn) exprs
+            pure (Match pat (NormalB body) [])
+          RecC _ [] -> error "empty record is not supported"
+          RecC cn fs -> do
+            (pat, exprs) <- mkRecordEncoder ser (sumProduct opt) cn fs
+            body <- serRecSum ser (serializedSumTxt opt cn) exprs
+            pure (Match pat (NormalB body) [])
+          _ -> error "Unsupported constructor"
+      )
+      cs
+  pure (LamE [VarP v] (CaseE (VarE v) matches))
+
+mkSerializeProd :: Serializer -> ProductOptions -> Dec -> ExpQ
+mkSerializeProd ser opt (DataD [] _ _ _ [c] _) = productToSerialize ser opt c
+mkSerializeProd ser opt (NewtypeD [] _ _ _ con _) = productToSerialize ser opt con
+mkSerializeProd _ _ _ = error "only data with single constructor or newtype decl is allowed"
+
+mkSerializeSum :: Serializer -> SumOptions -> Dec -> ExpQ
+mkSerializeSum ser opt (DataD [] _ _ _ cs _) = sumToSerialize ser opt cs
+mkSerializeSum ser opt (NewtypeD [] _ _ _ con _) = sumToSerialize ser opt [con]
+mkSerializeSum _ _ _ = error "only data or newtype decl is allowed"
+
+data ConInfo = ConInfo
+  { ciType :: !Name,
+    ciCon :: !Name
+  }
+
+data TagExp = TeArg | TeVar Name
+
+data SizeExp = SeArg | SeExp Exp
+
+data Deserializer normalObj recObj sum = Deserializer
+  { desField :: normalObj -> Int -> ExpQ,
+    desNamedField :: recObj -> Text -> ExpQ,
+    desNormalProd :: ConInfo -> (SizeExp -> normalObj -> ExpQ) -> ExpQ,
+    desRecProd :: ConInfo -> (SizeExp -> recObj -> ExpQ) -> ExpQ,
+    desUnaryCon :: sum -> ConInfo -> ExpQ,
+    desNormalCon :: sum -> ConInfo -> (SizeExp -> normalObj -> ExpQ) -> ExpQ,
+    desRecCon :: sum -> ConInfo -> (SizeExp -> recObj -> ExpQ) -> ExpQ,
+    desUnitSum :: Name -> (TagExp -> ExpQ) -> ExpQ,
+    desFieldSum :: Name -> (TagExp -> sum -> ExpQ) -> ExpQ,
+    desSum :: Name -> (TagExp -> ExpQ) -> (TagExp -> sum -> ExpQ) -> ExpQ
+  }
+
+mkNormalDecoder ::
+  Deserializer no ro s ->
+  Name ->
+  NonEmpty BangType ->
+  SizeExp ->
+  no ->
+  ExpQ
+mkNormalDecoder des cn fs@(_ :| t) se no = do
+  body <-
+    foldl'
+      (\e (idx, _) -> [|$e <*> $(desField des no idx)|])
+      [|$(conE cn) <$> $(desField des no 0)|]
+      (zip [1 ..] t)
+  let len = length fs
+      errMsg = show cn ++ ": length mismatch, expected " ++ show len ++ ", got "
+  case se of
+    SeArg ->
+      [|
+        \case
+          $(pure (LitP (IntegerL (fromIntegral len)))) -> $(pure body)
+          l -> fail ($(lift errMsg) ++ show l)
+        |]
+    SeExp e ->
+      [|
+        if $(pure e) == $(lift len)
+          then $(pure body)
+          else fail ($(lift errMsg) ++ show $(pure e))
+        |]
+
+mkRecordDecoder ::
+  Deserializer no ro s ->
+  ProductOptions ->
+  Name ->
+  [VarBangType] ->
+  SizeExp ->
+  ro ->
+  ExpQ
+mkRecordDecoder des opt cn fs se ro = do
+  (fields, stmts) <-
+    unzip
+      <$> traverse
+        ( \(serName, field) -> do
+            f <- newName "f"
+            expr <- desNamedField des ro serName
+            pure ((field, VarE f), BindS (VarP f) expr)
+        )
+        (sortRecFields opt fs)
+  let body = DoE Nothing (stmts ++ [NoBindS (VarE 'pure `AppE` RecConE cn fields)])
+      len = length fs
+      errMsg = show cn ++ ": size mismatch, expected " ++ show len ++ ", got "
+  case se of
+    SeArg ->
+      [|
+        \case
+          $(pure (LitP (IntegerL (fromIntegral len)))) -> $(pure body)
+          l -> fail ($(lift errMsg) ++ show l)
+        |]
+    SeExp e ->
+      [|
+        if $(pure e) == $(lift len)
+          then $(pure body)
+          else fail ($(lift errMsg) ++ show $(pure e))
+        |]
+
+deserializeToProd :: Deserializer no ro s -> ProductOptions -> Name -> Con -> ExpQ
+deserializeToProd _ _ _ (NormalC _ []) = error "empty constructor is not supported"
+deserializeToProd des _ ty (NormalC cn (h : t)) =
+  desNormalProd
+    des
+    ConInfo {ciType = ty, ciCon = cn}
+    (mkNormalDecoder des cn (h :| t))
+deserializeToProd _ _ _ (RecC _ []) = error "empty record is not supported"
+deserializeToProd des opt ty (RecC cn fs) =
+  desRecProd
+    des
+    ConInfo {ciType = ty, ciCon = cn}
+    (mkRecordDecoder des opt cn fs)
+deserializeToProd _ _ _ _ = error "Unsupported constructor"
+
+mkDeserializeProd :: Deserializer no ro s -> ProductOptions -> Dec -> ExpQ
+mkDeserializeProd des opt (DataD [] ty _ _ [c] _) = deserializeToProd des opt ty c
+mkDeserializeProd des opt (NewtypeD [] ty _ _ con _) = deserializeToProd des opt ty con
+mkDeserializeProd _ _ _ = error "Only data with single constructor or newtype decl is allowed"
+
+groupCon ::
+  [Name] ->
+  [(Name, Either (NonEmpty BangType) [VarBangType])] ->
+  [Con] ->
+  ([Name], [(Name, Either (NonEmpty BangType) [VarBangType])])
+groupCon unitAcc fieldAcc [] = (unitAcc, fieldAcc)
+groupCon unitAcc fieldAcc (h : t) = case h of
+  NormalC cn [] -> groupCon (cn : unitAcc) fieldAcc t
+  NormalC cn (fh : ft) ->
+    groupCon
+      unitAcc
+      ((cn, Left (fh :| ft)) : fieldAcc)
+      t
+  RecC _ [] -> error "empty record is not supported"
+  RecC cn fs ->
+    groupCon
+      unitAcc
+      ((cn, Right fs) : fieldAcc)
+      t
+  _ -> error "Unsupported constructor"
+
+deserializeToSum :: Deserializer no ro s -> SumOptions -> Name -> [Con] -> ExpQ
+deserializeToSum des opt ty cs = do
+  invalidTag <- do
+    t <- newName "t"
+    expr <- [|fail ($(lift (show ty ++ ": unknown constructor tag ")) ++ show $(varE t))|]
+    pure (Match (VarP t) (NormalB expr) [])
+  let unitBody =
+        fmap
+          ( \cn ->
+              Match
+                (LitP (StringL (serializedSum opt cn)))
+                (NormalB (VarE 'pure `AppE` ConE cn))
+                []
+          )
+          unitCon
+          ++ [invalidTag]
+  let unitDecoder te =
+        pure
+          ( case te of
+              TeArg -> LamCaseE unitBody
+              TeVar v -> CaseE (VarE v) unitBody
+          )
+  case (unitCon, fieldCon) of
+    ([], []) -> error "empty data is not supported"
+    (_ : _, []) -> desUnitSum des ty unitDecoder
+    ([], _ : _) -> desFieldSum des ty (fieldDecoder invalidTag)
+    (_ : _, _ : _) -> desSum des ty unitDecoder (fieldDecoder invalidTag)
+  where
+    (unitCon, fieldCon) = groupCon [] [] cs
+
+    fieldDecoder invalidTag te s = do
+      matches <-
+        traverse
+          ( \(cn, fields) ->
+              let info = ConInfo {ciType = ty, ciCon = cn}
+               in fmap
+                    ( \expr ->
+                        Match
+                          (LitP (StringL (serializedSum opt cn)))
+                          (NormalB expr)
+                          []
+                    )
+                    ( case fields of
+                        Left (_ :| []) -> desUnaryCon des s info
+                        Left fs -> desNormalCon des s info (mkNormalDecoder des cn fs)
+                        Right fs ->
+                          desRecCon
+                            des
+                            s
+                            info
+                            (mkRecordDecoder des (sumProduct opt) cn fs)
+                    )
+          )
+          fieldCon
+      let body = matches ++ [invalidTag]
+      pure
+        ( case te of
+            TeArg -> LamCaseE body
+            TeVar v -> CaseE (VarE v) body
+        )
+
+mkDeserializeSum :: Deserializer no ro s -> SumOptions -> Dec -> ExpQ
+mkDeserializeSum des opt (DataD [] ty _ _ cs _) = deserializeToSum des opt ty cs
+mkDeserializeSum des opt (NewtypeD [] ty _ _ con _) = deserializeToSum des opt ty [con]
+mkDeserializeSum _ _ _ = error "Only data or newtype is supported"

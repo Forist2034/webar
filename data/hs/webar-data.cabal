@@ -1,0 +1,81 @@
+cabal-version:      3.0
+name:               webar-data
+version:            0.1.0.0
+license:            AGPL-3.0-or-later
+license-file:       LICENSE
+maintainer:         dariankline@outlook.com
+author:             Jose Lane
+build-type:         Simple
+extra-source-files:
+    tests/cbor/data/*.bin
+    tests/cbor/data/*.txt
+    tests/json/data/*.json
+
+library
+    exposed-modules:
+        Webar.Data.Json
+        Webar.Data.Json.TH
+        Webar.Data.Cbor
+        Webar.Data.Cbor.TH
+        Webar.Data.TH
+
+    hs-source-dirs:   src
+    other-modules:    Webar.Data.Internal.TH
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base ^>=4.17.2.1,
+        text >=2.0.2 && <2.1,
+        bytestring >=0.11.5 && <0.12,
+        containers >=0.6.7 && <0.7,
+        vector >=0.13.1 && <0.14,
+        uuid-types >=1.0.5 && <1.1,
+        aeson >=2.2.1 && <2.3,
+        cborg >=0.2.10 && <0.3,
+        template-haskell >=2.19.0 && <2.20
+
+library test-common
+    exposed-modules:  Common
+    hs-source-dirs:   tests/common
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base,
+        text >=2.0.2 && <2.1,
+        bytestring >=0.11.5 && <0.12,
+        vector >=0.13.1 && <0.14,
+        uuid-types >=1.0.5 && <1.1,
+        hspec >=2.11 && <2.12,
+        webar-data
+
+test-suite cbor
+    type:             exitcode-stdio-1.0
+    main-is:          Main.hs
+    hs-source-dirs:   tests/cbor
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base,
+        text >=2.0.2 && <2.1,
+        bytestring >=0.11.5 && <0.12,
+        vector >=0.13.1 && <0.14,
+        filepath >=1.4.2 && <1.5,
+        hspec >=2.11 && <2.12,
+        webar-data,
+        test-common
+
+test-suite json
+    type:             exitcode-stdio-1.0
+    main-is:          Main.hs
+    hs-source-dirs:   tests/json
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base,
+        text >=2.0.2 && <2.1,
+        bytestring >=0.11.5 && <0.12,
+        vector >=0.13.1 && <0.14,
+        filepath >=1.4.2 && <1.5,
+        hspec >=2.11 && <2.12,
+        webar-data,
+        test-common
