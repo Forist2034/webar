@@ -1,0 +1,59 @@
+cabal-version:      3.0
+name:               webar-core
+version:            0.1.0.0
+license:            AGPL-3.0-only
+license-file:       LICENSE
+maintainer:         dariankline@outlook.com
+author:             Jose Lane
+build-type:         Simple
+extra-source-files:
+    tests/data/cbor/*.bin
+    tests/data/json/*.json
+
+library
+    exposed-modules:
+        Webar.Digest
+        Webar.Types
+        Webar.UUID
+
+    hs-source-dirs:   src
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base ^>=4.17.2.1,
+        text >=2.0.2 && <2.1,
+        bytestring >=0.11.5 && <0.12,
+        memory >=0.18.0 && <0.19,
+        aeson >=2.2.1 && <2.3,
+        cborg >=0.2.10 && <0.3,
+        uuid-types >=1.0.5 && <1.1,
+        cryptonite >=0.30 && <0.31,
+        basement >=0.0.16 && <0.1,
+        webar-data
+
+test-suite core
+    type:             exitcode-stdio-1.0
+    main-is:          Main.hs
+    hs-source-dirs:   tests/core
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base,
+        hspec >=2.11 && <2.12,
+        uuid-types,
+        webar-core
+
+test-suite data
+    type:             exitcode-stdio-1.0
+    main-is:          Main.hs
+    hs-source-dirs:   tests/data
+    default-language: Haskell2010
+    ghc-options:      -Wall
+    build-depends:
+        base,
+        bytestring,
+        hspec >=2.11 && <2.12,
+        cryptonite,
+        filepath >=1.4.2 && <1.5,
+        webar-core,
+        webar-data

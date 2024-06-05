@@ -1,0 +1,16 @@
+[package]
+name = "webar-core"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde.workspace = true
+const-hex = { version = "1.11.3", features = ["serde"] }
+webar-data.workspace = true
+
+[dev-dependencies]
+ciborium.workspace = true
+hex-literal.workspace = true

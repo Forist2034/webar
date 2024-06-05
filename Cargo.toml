@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["./data/derive-rs", "./data/data-rs"]
+members = ["./data/derive-rs", "./data/data-rs", "./core/rs"]
 
 
 [workspace.package]
@@ -17,3 +17,4 @@ uuid = { version = "1.8.0", features = ["serde"] }
 hex-literal = "0.4.1"
 # projects
 webar-data = { path = "./data/data-rs" }
+webar-core = { path = "./core/rs" }
