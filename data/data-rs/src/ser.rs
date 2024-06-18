@@ -199,6 +199,16 @@ prim_impl!(i16, serialize_i16);
 prim_impl!(i32, serialize_i32);
 prim_impl!(i64, serialize_i64);
 
+/// Never type, use std `!` when stabilized
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Never {}
+
+impl Serialize for Never {
+    fn serialize<S: Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+        match *self {}
+    }
+}
+
 impl Serialize for str {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self)
@@ -258,5 +268,11 @@ impl Serialize for uuid::Uuid {
         } else {
             serializer.serialize_bytes(self.as_bytes())
         }
+    }
+}
+
+impl<'a, T: ?Sized + Serialize> Serialize for &'a T {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        T::serialize(self, serializer)
     }
 }
