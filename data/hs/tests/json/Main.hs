@@ -72,6 +72,7 @@ text = describe "text" do
   test "Å" "unnormalized_str"
   test "水" "ch_str"
   test "𐅑" "geek_str"
+  test "€$\x0f\nA'B\"\\\\\"/" "escape_str"
   where
     test :: Text -> FilePath -> Spec
     test t = mkTest (show t) t
@@ -91,6 +92,7 @@ main = hspec do
     prodNormal mkTest
     prodSort mkTest
     prodSortNested mkTest
+    prodWeird mkTest
   describe "sum" do
     unitSum mkTest
     recordSum mkTest

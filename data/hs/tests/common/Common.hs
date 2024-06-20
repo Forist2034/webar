@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -12,6 +13,8 @@ module Common
     prodSort,
     ProdSortNested,
     prodSortNested,
+    ProdWeird,
+    prodWeird,
     SumUnit,
     unitSum,
     SumNormal,
@@ -142,6 +145,49 @@ prodSortNested mkTest = describe "sort_nested" do
         psoAa = 1000
       }
     "prod_sort_nested_1"
+
+data ProdWeird = ProdWeird
+  { pwCr :: Text,
+    pw1 :: Text,
+    pwEuro :: Text,
+    pwHebrew :: Text,
+    pwControl :: Text,
+    pwO :: Text,
+    pwScript :: Text,
+    pwSmiley :: Text
+  }
+  deriving (Show, Eq)
+
+deriveProdData
+  ProductOptions
+    { fieldLabelModifier = \case
+        "pwCr" -> "\r"
+        "pw1" -> "1"
+        "pwEuro" -> "€"
+        "pwHebrew" -> "דּ"
+        "pwControl" -> "\x80"
+        "pwO" -> "ö"
+        "pwScript" -> "</script>"
+        "pwSmiley" -> "😂"
+        _ -> error "unreachable"
+    }
+  ''ProdWeird
+
+prodWeird :: DataTests ProdWeird
+prodWeird mkTest =
+  mkTest
+    "weird"
+    ProdWeird
+      { pwCr = "Carriage Return",
+        pw1 = "One",
+        pwEuro = "Euro Sign",
+        pwHebrew = "Hebrew Letter Dalet With Dagesh",
+        pwControl = "Control",
+        pwO = "Latin Small Letter O With Diaeresis",
+        pwScript = "Browser Challenge",
+        pwSmiley = "Smiley"
+      }
+    "prod_weird"
 
 data SumUnit
   = SuA
