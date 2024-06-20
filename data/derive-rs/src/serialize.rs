@@ -233,7 +233,7 @@ fn derive_enum(serializer: &Ident, data: DataEnum) -> Block {
         let opt = VariantOptions::from_attributes(&v.attrs).unwrap();
         let name = opt.rename;
         arms.push(match v.fields {
-            Fields::Named(n) => derive_struct_variant(&serializer, v.ident, &name, n),
+            Fields::Named(n) => derive_struct_variant(serializer, v.ident, &name, n),
             Fields::Unnamed(u) if u.unnamed.len() == 1 => {
                 let ident = v.ident;
                 let field = Ident::new("f", Span::call_site());
@@ -264,7 +264,7 @@ fn derive_enum(serializer: &Ident, data: DataEnum) -> Block {
                     comma: Some(Default::default()),
                 }
             }
-            Fields::Unnamed(u) => derive_tuple_variant(&serializer, v.ident, &name, u),
+            Fields::Unnamed(u) => derive_tuple_variant(serializer, v.ident, &name, u),
             Fields::Unit => {
                 let ident = v.ident;
                 Arm {
