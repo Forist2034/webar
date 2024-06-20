@@ -10,6 +10,7 @@ license.workspace = true
 ciborium-io = "0.2.2"
 ciborium-ll = "0.2.2"
 serde.workspace = true
+serde_json = "1.0.116"
 uuid.workspace = true
 webar-derive = { path = "../derive-rs" }
 

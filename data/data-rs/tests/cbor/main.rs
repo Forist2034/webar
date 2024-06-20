@@ -2,6 +2,9 @@ use std::fmt::Debug;
 
 use webar_data::{cbor::to_vec, ser::Serialize};
 
+#[path = "../common/mod.rs"]
+mod common;
+
 fn test_serde<D: Serialize + serde::de::DeserializeOwned + Eq + Debug>(data: D, bin: &[u8]) {
     assert_eq!(to_vec(&data), bin, "serialize");
     assert_eq!(
@@ -269,133 +272,64 @@ mod struct_t {
     use crate::test_serde;
 
     mod sample {
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        struct Sample {
-            a: u32,
-            b: Vec<u64>,
-        }
+        use crate::{common::product::Sample, test_serde};
 
         #[test]
         fn sample_0() {
-            test_serde(
-                Sample {
-                    a: 1,
-                    b: Vec::from([2, 3]),
-                },
-                include_bytes!("./data/prod_sample_0.bin"),
-            )
+            test_serde(Sample::sample(), include_bytes!("./data/prod_sample_0.bin"))
         }
-
         #[test]
         fn bound() {
             test_serde(
-                Sample {
-                    a: u32::MAX,
-                    b: Vec::from([0, 1, u64::MAX]),
-                },
+                Sample::sample_bound(),
                 include_bytes!("./data/prod_sample_max.bin"),
             )
         }
     }
 
     mod tuple {
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        struct Tuple(i32, Vec<i32>, Vec<u16>);
+        use crate::{common::product::Tuple, test_serde};
 
         #[test]
         fn t0() {
-            test_serde(
-                Tuple(1, Vec::from([2, 3]), Vec::from([4, 5])),
-                include_bytes!("./data/prod_normal_0.bin"),
-            )
+            test_serde(Tuple::t0(), include_bytes!("./data/prod_normal_0.bin"))
         }
         #[test]
         fn bound() {
             test_serde(
-                Tuple(i32::MIN, Vec::from([0, i32::MAX, 10]), Vec::from([1, 2, 3])),
+                Tuple::bound(),
                 include_bytes!("./data/prod_normal_bound.bin"),
             )
         }
     }
 
     mod sort {
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        struct Sorted {
-            a: u8,
-            c: Vec<i32>,
-            ab: i32,
-            bac: String,
-        }
+        use crate::{common::product::Sorted, test_serde};
 
         #[test]
         fn t0() {
-            test_serde(
-                Sorted {
-                    a: u8::MAX,
-                    ab: 10,
-                    bac: String::from("example"),
-                    c: Vec::from([-1, 0, 1]),
-                },
-                include_bytes!("./data/prod_sort_0.bin"),
-            )
+            test_serde(Sorted::t0(), include_bytes!("./data/prod_sort_0.bin"))
         }
         #[test]
         fn t1() {
-            test_serde(
-                Sorted {
-                    a: 1,
-                    c: Vec::new(),
-                    ab: 12,
-                    bac: String::from("sss"),
-                },
-                include_bytes!("./data/prod_sort_1.bin"),
-            )
+            test_serde(Sorted::t1(), include_bytes!("./data/prod_sort_1.bin"))
         }
     }
 
     mod sort_nested {
-        use serde::Deserialize;
-        use webar_derive::Serialize;
-
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-        struct Inner {
-            b: u16,
-            aa: bool,
-        }
-        #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-        struct Outer {
-            i: Inner,
-            aa: u32,
-            cab: i64,
-        }
+        use crate::{common::product::SortNested, test_serde};
 
         #[test]
         fn t0() {
             test_serde(
-                Outer {
-                    aa: 1000,
-                    cab: -6,
-                    i: Inner { b: 10, aa: true },
-                },
+                SortNested::T0,
                 include_bytes!("./data/prod_sort_nested_0.bin"),
             )
         }
         #[test]
         fn bound() {
             test_serde(
-                Outer {
-                    aa: 1000,
-                    cab: -255,
-                    i: Inner { b: 10, aa: true },
-                },
+                SortNested::BOUND,
                 include_bytes!("./data/prod_sort_nested_1.bin"),
             )
         }
@@ -443,15 +377,7 @@ mod struct_t {
 mod variant {
 
     mod unit_variant {
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        enum Unit {
-            #[serde(rename = "a")]
-            A,
-            #[serde(rename = "b")]
-            BB,
-            #[serde(rename = "var3")]
-            Variant3,
-        }
+        use crate::common::sum::Unit;
 
         #[test]
         fn variant_a() {
@@ -468,115 +394,46 @@ mod variant {
     }
 
     mod struct_variant {
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        enum StructVar {
-            #[serde(rename = "v1")]
-            V1 { a: u32, k: i16, ab: i8, c: bool },
-            #[serde(rename = "sv2")]
-            V2 { z: bool, full: bool, new: u32 },
-        }
+        use crate::{common::sum::Struct, test_serde};
 
         #[test]
         fn var_v1() {
-            test_serde(
-                StructVar::V1 {
-                    a: 10,
-                    k: -128,
-                    ab: -10,
-                    c: false,
-                },
-                include_bytes!("./data/var_v1.bin"),
-            )
+            test_serde(Struct::T_V1, include_bytes!("./data/var_v1.bin"))
         }
         #[test]
         fn var_v2() {
-            test_serde(
-                StructVar::V2 {
-                    z: false,
-                    full: true,
-                    new: 0,
-                },
-                include_bytes!("./data/var_sv2.bin"),
-            )
+            test_serde(Struct::T_V2, include_bytes!("./data/var_sv2.bin"))
         }
     }
 
     mod tuple_variant {
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        enum TupleVar {
-            #[serde(rename = "tv1")]
-            TV1(u8, i16),
-            #[serde(rename = "tv2")]
-            TV2(bool, String),
-        }
+        use crate::{common::sum::Tuple, test_serde};
 
         #[test]
         fn var_tv1() {
-            test_serde(
-                TupleVar::TV1(123, -3200),
-                include_bytes!("./data/var_tv1.bin"),
-            )
+            test_serde(Tuple::T_V1, include_bytes!("./data/var_tv1.bin"))
         }
         #[test]
         fn var_tv2() {
-            test_serde(
-                TupleVar::TV2(false, String::from("123")),
-                include_bytes!("./data/var_tv2.bin"),
-            )
+            test_serde(Tuple::tv2(), include_bytes!("./data/var_tv2.bin"))
         }
     }
 
     mod newtype_variant {
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        enum NewVar {
-            #[serde(rename = "nv")]
-            Nv1(bool),
-            #[serde(rename = "nv2")]
-            Nv2(Vec<u32>),
-        }
+        use crate::{common::sum::Unary, test_serde};
 
         #[test]
         fn var_nv1() {
-            test_serde(NewVar::Nv1(true), include_bytes!("./data/var_nv.bin"))
+            test_serde(Unary::T_V1, include_bytes!("./data/var_nv.bin"))
         }
         #[test]
         fn var_nv2() {
-            test_serde(
-                NewVar::Nv2(Vec::from([123, 456])),
-                include_bytes!("./data/var_nv2.bin"),
-            )
+            test_serde(Unary::nv2(), include_bytes!("./data/var_nv2.bin"))
         }
     }
 
     mod mixed_variant {
-        use crate::test_serde;
-
-        #[derive(Debug, PartialEq, Eq, webar_derive::Serialize, serde::Deserialize)]
-        enum Mixed {
-            #[serde(rename = "mv_unit")]
-            MvUnit,
-            #[serde(rename = "mv_u2")]
-            MvUnit2,
-            #[serde(rename = "mv_tup")]
-            MvTup(bool, bool),
-            #[serde(rename = "mv_newt")]
-            MxNewType(i8),
-            #[serde(rename = "mv_struct")]
-            MvStruct { c: i8, ac: bool, ab: String },
-            #[serde(rename = "mv_rename")]
-            MvRename {
-                c: bool,
-                #[serde(rename = "a")]
-                k: u64,
-                ds: u32,
-            },
-        }
+        use crate::{common::sum::Mixed, test_serde};
 
         #[test]
         fn var_unit() {
@@ -588,26 +445,16 @@ mod variant {
         }
         #[test]
         fn var_tup() {
-            test_serde(
-                Mixed::MvTup(false, true),
-                include_bytes!("./data/var_mv_tup.bin"),
-            )
+            test_serde(Mixed::T_TUP, include_bytes!("./data/var_mv_tup.bin"))
         }
         #[test]
         fn var_newt() {
-            test_serde(
-                Mixed::MxNewType(-10),
-                include_bytes!("./data/var_mv_newt.bin"),
-            )
+            test_serde(Mixed::T_UNARY, include_bytes!("./data/var_mv_newt.bin"))
         }
         #[test]
         fn var_struct() {
             test_serde(
-                Mixed::MvStruct {
-                    c: -1,
-                    ac: true,
-                    ab: String::from("a"),
-                },
+                Mixed::t_struct(),
                 include_bytes!("./data/var_mv_struct.bin"),
             )
         }
@@ -626,18 +473,15 @@ mod variant {
 }
 
 mod uuid {
-    use crate::test_serde;
+    use crate::{common::uuid, test_serde};
 
     #[test]
     fn nil() {
-        test_serde(uuid::Uuid::nil(), include_bytes!("./data/uuid_nil.bin"))
+        test_serde(uuid::NIL, include_bytes!("./data/uuid_nil.bin"))
     }
 
     #[test]
     fn t1() {
-        test_serde(
-            uuid::uuid!("c2cc10e1-57d6-4b6f-9899-38d972112d8c"),
-            include_bytes!("./data/uuid_1.bin"),
-        )
+        test_serde(uuid::T1, include_bytes!("./data/uuid_1.bin"))
     }
 }

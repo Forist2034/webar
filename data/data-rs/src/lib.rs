@@ -2,6 +2,8 @@ pub mod ser;
 
 pub mod cbor;
 
+pub mod json;
+
 #[doc(hidden)]
 pub mod __internal {
     pub use std::result::Result;
