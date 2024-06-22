@@ -20,7 +20,6 @@ where
 
 import Codec.CBOR.Decoding
 import Codec.CBOR.Encoding
-import Control.Applicative (Applicative (liftA2))
 import Data.Foldable (Foldable (foldl'))
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text (Text)
@@ -61,31 +60,20 @@ serializer =
           <> $(pure (membersExpr fs))
         |]
 
+serializeClass :: Class
+serializeClass = Class {clsName = ''ToCbor, clsFun = 'toCbor}
+
 mkSumToCbor :: SumOptions -> Name -> ExpQ
-mkSumToCbor opt n =
-  reify n >>= \case
-    TyConI dec -> mkSerializeSum serializer opt dec
-    _ -> error "Type decl expected"
+mkSumToCbor = mkSerializeSum serializer
 
 mkProdToCbor :: ProductOptions -> Name -> ExpQ
-mkProdToCbor opt n =
-  reify n >>= \case
-    TyConI dec -> mkSerializeProd serializer opt dec
-    _ -> error "Type decl expected"
+mkProdToCbor = mkSerializeProd serializer
 
 deriveSumToCbor :: SumOptions -> Name -> DecsQ
-deriveSumToCbor opt n =
-  [d|
-    instance ToCbor $(conT n) where
-      toCbor = $(mkSumToCbor opt n)
-    |]
+deriveSumToCbor = deriveSerializeSum serializeClass serializer
 
 deriveProdToCbor :: ProductOptions -> Name -> DecsQ
-deriveProdToCbor opt n =
-  [d|
-    instance ToCbor $(conT n) where
-      toCbor = $(mkProdToCbor opt n)
-    |]
+deriveProdToCbor = deriveSerializeProd serializeClass serializer
 
 decodeNamedField :: (FromCbor a) => Text -> Decoder s a
 decodeNamedField fn =
@@ -126,36 +114,33 @@ deserializer =
           _ -> fail $(lift (show ty ++ ": invalid sum map"))
         |]
 
+deserializeClass :: Class
+deserializeClass = Class {clsName = ''FromCbor, clsFun = 'fromCbor}
+
 mkSumFromCbor :: SumOptions -> Name -> ExpQ
-mkSumFromCbor opt n =
-  reify n >>= \case
-    TyConI dec -> mkDeserializeSum deserializer opt dec
-    _ -> error "data or newtype expected"
+mkSumFromCbor = mkDeserializeSum deserializer
 
 mkProdFromCbor :: ProductOptions -> Name -> ExpQ
-mkProdFromCbor opt n =
-  reify n >>= \case
-    TyConI dec -> mkDeserializeProd deserializer opt dec
-    _ -> error "data with single constructor or newtype expected"
+mkProdFromCbor = mkDeserializeProd deserializer
 
 deriveSumFromCbor :: SumOptions -> Name -> DecsQ
-deriveSumFromCbor opt n =
-  [d|
-    instance FromCbor $(conT n) where
-      fromCbor = $(mkSumFromCbor opt n)
-    |]
+deriveSumFromCbor = deriveDeserializeSum deserializeClass deserializer
 
 deriveProdFromCbor :: ProductOptions -> Name -> DecsQ
-deriveProdFromCbor opt n =
-  [d|
-    instance FromCbor $(conT n) where
-      fromCbor = $(mkProdFromCbor opt n)
-    |]
+deriveProdFromCbor = deriveDeserializeProd deserializeClass deserializer
 
 deriveSumCbor :: SumOptions -> Name -> DecsQ
-deriveSumCbor opt n =
-  liftA2 (++) (deriveSumFromCbor opt n) (deriveSumToCbor opt n)
+deriveSumCbor =
+  deriveSerdeSum
+    serializeClass
+    serializer
+    deserializeClass
+    deserializer
 
 deriveProdCbor :: ProductOptions -> Name -> DecsQ
-deriveProdCbor opt n =
-  liftA2 (++) (deriveProdFromCbor opt n) (deriveProdToCbor opt n)
+deriveProdCbor =
+  deriveSerdeProd
+    serializeClass
+    serializer
+    deserializeClass
+    deserializer

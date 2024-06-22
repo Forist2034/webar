@@ -5,15 +5,22 @@ module Webar.Data.Internal.TH
   ( ProductOptions (..),
     SumOptions (..),
     camelTo2,
+    Class (..),
     Serializer (..),
     mkSerializeProd,
+    deriveSerializeProd,
     mkSerializeSum,
+    deriveSerializeSum,
     ConInfo (ciType, ciCon),
     TagExp (..),
     SizeExp (..),
     Deserializer (..),
     mkDeserializeProd,
+    deriveDeserializeProd,
     mkDeserializeSum,
+    deriveDeserializeSum,
+    deriveSerdeProd,
+    deriveSerdeSum,
   )
 where
 
@@ -35,6 +42,65 @@ data SumOptions = SumOptions
   { constructorTagModifier :: String -> String,
     sumProduct :: ProductOptions
   }
+
+data Class = Class
+  { clsName :: Name,
+    clsFun :: Name
+  }
+
+data ProductDec = ProductDec {dpRoles :: [Role], dpCon :: Con}
+
+reifyProductCon :: Name -> ConQ
+reifyProductCon n =
+  reify n >>= \case
+    TyConI (DataD _ _ _ _ [c] _) -> pure c
+    TyConI (NewtypeD _ _ _ _ con _) -> pure con
+    _ -> fail "only data with single constructor or newtype decl is allowed"
+
+reifyProductDec :: Name -> Q ProductDec
+reifyProductDec n = do
+  con <- reifyProductCon n
+  roles <- reifyRoles n
+  pure ProductDec {dpRoles = roles, dpCon = con}
+
+data SumDec = SumDec {dsRoles :: [Role], dsCons :: [Con]}
+
+reifySumCon :: Name -> Q [Con]
+reifySumCon n =
+  reify n >>= \case
+    TyConI (DataD _ _ _ _ cs _) -> pure cs
+    TyConI (NewtypeD _ _ _ _ con _) -> pure [con]
+    _ -> fail "only data or newtype decl is allowed"
+
+reifySumDec :: Name -> Q SumDec
+reifySumDec n = do
+  cons <- reifySumCon n
+  roles <- reifyRoles n
+  pure SumDec {dsRoles = roles, dsCons = cons}
+
+mkInstance :: Class -> Name -> [Role] -> Exp -> DecsQ
+mkInstance cls ty rs e = do
+  (constraints, tyWithArg) <-
+    foldlM
+      ( \(cs, t) r -> do
+          tyArg <- newName "a"
+          case r of
+            PhantomR -> pure (cs, AppT t (VarT tyArg))
+            _ ->
+              pure
+                ( AppT (ConT (clsName cls)) (VarT tyArg) : cs,
+                  AppT t (VarT tyArg)
+                )
+      )
+      ([], ConT ty)
+      rs
+  pure
+    [ InstanceD
+        Nothing
+        constraints
+        (AppT (ConT (clsName cls)) tyWithArg)
+        [ValD (VarP (clsFun cls)) (NormalB e) []]
+    ]
 
 data Serializer = Serializer
   { serField :: Exp -> ExpQ,
@@ -134,15 +200,27 @@ sumToSerialize ser opt cs = do
       cs
   pure (LamE [VarP v] (CaseE (VarE v) matches))
 
-mkSerializeProd :: Serializer -> ProductOptions -> Dec -> ExpQ
-mkSerializeProd ser opt (DataD [] _ _ _ [c] _) = productToSerialize ser opt c
-mkSerializeProd ser opt (NewtypeD [] _ _ _ con _) = productToSerialize ser opt con
-mkSerializeProd _ _ _ = error "only data with single constructor or newtype decl is allowed"
+mkSerializeProd :: Serializer -> ProductOptions -> Name -> ExpQ
+mkSerializeProd ser opt n = reifyProductCon n >>= productToSerialize ser opt
 
-mkSerializeSum :: Serializer -> SumOptions -> Dec -> ExpQ
-mkSerializeSum ser opt (DataD [] _ _ _ cs _) = sumToSerialize ser opt cs
-mkSerializeSum ser opt (NewtypeD [] _ _ _ con _) = sumToSerialize ser opt [con]
-mkSerializeSum _ _ _ = error "only data or newtype decl is allowed"
+mkSerializeProdInst :: Class -> Serializer -> ProductOptions -> Name -> ProductDec -> DecsQ
+mkSerializeProdInst cls ser opt n d =
+  productToSerialize ser opt (dpCon d) >>= mkInstance cls n (dpRoles d)
+
+deriveSerializeProd :: Class -> Serializer -> ProductOptions -> Name -> DecsQ
+deriveSerializeProd cls ser opt n =
+  reifyProductDec n >>= mkSerializeProdInst cls ser opt n
+
+mkSerializeSum :: Serializer -> SumOptions -> Name -> ExpQ
+mkSerializeSum ser opt n = reifySumCon n >>= sumToSerialize ser opt
+
+mkSerializeSumInst :: Class -> Serializer -> SumOptions -> Name -> SumDec -> DecsQ
+mkSerializeSumInst cls ser opt n d =
+  sumToSerialize ser opt (dsCons d) >>= mkInstance cls n (dsRoles d)
+
+deriveSerializeSum :: Class -> Serializer -> SumOptions -> Name -> DecsQ
+deriveSerializeSum cls ser opt n =
+  reifySumDec n >>= mkSerializeSumInst cls ser opt n
 
 data ConInfo = ConInfo
   { ciType :: !Name,
@@ -245,10 +323,16 @@ deserializeToProd des opt ty (RecC cn fs) =
     (mkRecordDecoder des opt cn fs)
 deserializeToProd _ _ _ _ = error "Unsupported constructor"
 
-mkDeserializeProd :: Deserializer no ro s -> ProductOptions -> Dec -> ExpQ
-mkDeserializeProd des opt (DataD [] ty _ _ [c] _) = deserializeToProd des opt ty c
-mkDeserializeProd des opt (NewtypeD [] ty _ _ con _) = deserializeToProd des opt ty con
-mkDeserializeProd _ _ _ = error "Only data with single constructor or newtype decl is allowed"
+mkDeserializeProd :: Deserializer no ro s -> ProductOptions -> Name -> ExpQ
+mkDeserializeProd des opt n = reifyProductCon n >>= deserializeToProd des opt n
+
+mkDeserializeProdInst :: Class -> Deserializer no ro s -> ProductOptions -> Name -> ProductDec -> DecsQ
+mkDeserializeProdInst cls des opt n d =
+  deserializeToProd des opt n (dpCon d) >>= mkInstance cls n (dpRoles d)
+
+deriveDeserializeProd :: Class -> Deserializer no ro s -> ProductOptions -> Name -> DecsQ
+deriveDeserializeProd cls des opt n =
+  reifyProductDec n >>= mkDeserializeProdInst cls des opt n
 
 groupCon ::
   [Name] ->
@@ -332,7 +416,43 @@ deserializeToSum des opt ty cs = do
             TeVar v -> CaseE (VarE v) body
         )
 
-mkDeserializeSum :: Deserializer no ro s -> SumOptions -> Dec -> ExpQ
-mkDeserializeSum des opt (DataD [] ty _ _ cs _) = deserializeToSum des opt ty cs
-mkDeserializeSum des opt (NewtypeD [] ty _ _ con _) = deserializeToSum des opt ty [con]
-mkDeserializeSum _ _ _ = error "Only data or newtype is supported"
+mkDeserializeSum :: Deserializer no ro s -> SumOptions -> Name -> ExpQ
+mkDeserializeSum des opt n = reifySumCon n >>= deserializeToSum des opt n
+
+mkDeserializeSumInst :: Class -> Deserializer no ro s -> SumOptions -> Name -> SumDec -> DecsQ
+mkDeserializeSumInst cls des opt n d =
+  deserializeToSum des opt n (dsCons d) >>= mkInstance cls n (dsRoles d)
+
+deriveDeserializeSum :: Class -> Deserializer no ro s -> SumOptions -> Name -> DecsQ
+deriveDeserializeSum cls des opt n =
+  reifySumDec n >>= mkDeserializeSumInst cls des opt n
+
+deriveSerdeProd ::
+  Class ->
+  Serializer ->
+  Class ->
+  Deserializer no ro s ->
+  ProductOptions ->
+  Name ->
+  DecsQ
+deriveSerdeProd serCls ser desCls des opt n =
+  reifyProductDec n >>= \d ->
+    liftA2
+      (++)
+      (mkSerializeProdInst serCls ser opt n d)
+      (mkDeserializeProdInst desCls des opt n d)
+
+deriveSerdeSum ::
+  Class ->
+  Serializer ->
+  Class ->
+  Deserializer no ro s ->
+  SumOptions ->
+  Name ->
+  DecsQ
+deriveSerdeSum serCls ser desCls des opt n =
+  reifySumDec n >>= \d ->
+    liftA2
+      (++)
+      (mkSerializeSumInst serCls ser opt n d)
+      (mkDeserializeSumInst desCls des opt n d)

@@ -18,7 +18,6 @@ module Webar.Data.Json.TH
   )
 where
 
-import Control.Applicative (Applicative (liftA2))
 import Data.Aeson ((.:))
 import qualified Data.Aeson as AE
 import Data.Aeson.Encoding
@@ -56,40 +55,37 @@ serializer =
        in [|pairs $(pure contentExpr)|]
     listExpr fs = [|list id $(pure (ListE fs))|]
 
+serializeClass :: Class
+serializeClass = Class {clsName = ''ToJSON, clsFun = 'toJson}
+
 mkSumToJSON :: SumOptions -> Name -> ExpQ
-mkSumToJSON opt n =
-  reify n >>= \case
-    TyConI dec -> mkSerializeSum serializer opt dec
-    _ -> error "expect data or newtype decl"
+mkSumToJSON = mkSerializeSum serializer
 
 mkProdToJSON :: ProductOptions -> Name -> ExpQ
-mkProdToJSON opt n =
-  reify n >>= \case
-    TyConI dec -> mkSerializeProd serializer opt dec
-    _ -> error "expect data with single constructor or newtype"
+mkProdToJSON = mkSerializeProd serializer
 
 deriveSumToJSON :: SumOptions -> Name -> DecsQ
-deriveSumToJSON opt n =
-  [d|
-    instance ToJSON $(conT n) where
-      toJson = $(mkSumToJSON opt n)
-    |]
+deriveSumToJSON = deriveSerializeSum serializeClass serializer
 
 deriveProdToJSON :: ProductOptions -> Name -> DecsQ
-deriveProdToJSON opt n =
-  [d|
-    instance ToJSON $(conT n) where
-      toJson = $(mkProdToJSON opt n)
-    |]
+deriveProdToJSON = deriveSerializeProd serializeClass serializer
+
+parseArrEntry :: (FromJSON a) => V.Vector AE.Value -> Int -> AE.Parser a
+parseArrEntry v idx =
+  parseJSON (V.unsafeIndex v idx) <?> AE.Index idx
+{-# INLINE parseArrEntry #-}
+
+parseField :: (FromJSON a) => AE.Object -> AE.Key -> AE.Parser a
+parseField o k = o .: k <?> AE.Key k
+{-# INLINE parseField #-}
 
 deserializer :: Deserializer Exp Exp Exp
 deserializer =
   Deserializer
     { desField = \vec idx ->
-        [|parseJSON (V.unsafeIndex $(pure vec) $(lift idx)) <?> AE.Index $(lift idx)|],
+        [|parseArrEntry $(pure vec) $(lift idx)|],
       desNamedField = \obj keyStr ->
-        let key = Key.fromText keyStr
-         in [|($(pure obj) .: $(lift key)) <?> AE.Key $(lift key)|],
+        [|parseField $(pure obj) $(lift (Key.fromText keyStr))|],
       desNormalProd = \ci f -> desArray (ciType ci) f,
       desRecProd = \ci f -> desObject (ciType ci) f,
       desUnaryCon = \v ci ->
@@ -139,42 +135,33 @@ deserializer =
           _ -> fail $(lift (show ty ++ ": invalid sum object"))
         |]
 
+deserializeClass :: Class
+deserializeClass = Class {clsName = ''FromJSON, clsFun = 'parseJSON}
+
 mkProdParseJSON :: ProductOptions -> Name -> ExpQ
-mkProdParseJSON opt n =
-  reify n >>= \case
-    TyConI dec -> mkDeserializeProd deserializer opt dec
-    _ -> error "expect data with single constructor or newtype decl"
+mkProdParseJSON = mkDeserializeProd deserializer
 
 mkSumParseJSON :: SumOptions -> Name -> ExpQ
-mkSumParseJSON opt n =
-  reify n >>= \case
-    TyConI dec -> mkDeserializeSum deserializer opt dec
-    _ -> error "expect data or newtype decl"
+mkSumParseJSON = mkDeserializeSum deserializer
 
 deriveProdFromJSON :: ProductOptions -> Name -> DecsQ
-deriveProdFromJSON opt n =
-  [d|
-    instance FromJSON $(conT n) where
-      parseJSON = $(mkProdParseJSON opt n)
-    |]
+deriveProdFromJSON = deriveDeserializeProd deserializeClass deserializer
 
 deriveSumFromJSON :: SumOptions -> Name -> DecsQ
-deriveSumFromJSON opt n =
-  [d|
-    instance FromJSON $(conT n) where
-      parseJSON = $(mkSumParseJSON opt n)
-    |]
+deriveSumFromJSON = deriveDeserializeSum deserializeClass deserializer
 
 deriveSumJSON :: SumOptions -> Name -> DecsQ
-deriveSumJSON opt n =
-  liftA2
-    (++)
-    (deriveSumFromJSON opt n)
-    (deriveSumToJSON opt n)
+deriveSumJSON =
+  deriveSerdeSum
+    serializeClass
+    serializer
+    deserializeClass
+    deserializer
 
 deriveProdJSON :: ProductOptions -> Name -> DecsQ
-deriveProdJSON opt n =
-  liftA2
-    (++)
-    (deriveProdFromJSON opt n)
-    (deriveProdToJSON opt n)
+deriveProdJSON =
+  deriveSerdeProd
+    serializeClass
+    serializer
+    deserializeClass
+    deserializer
