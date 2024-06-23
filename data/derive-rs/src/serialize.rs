@@ -21,6 +21,8 @@ struct Bound {
 #[darling(attributes(serde))]
 struct Options {
     #[darling(default)]
+    transparent: bool,
+    #[darling(default)]
     bound: Bound,
 }
 
@@ -295,6 +297,40 @@ fn derive_enum(serializer: &Ident, data: DataEnum) -> Block {
     }
 }
 
+fn derive_transparent(serializer: &Ident, data: Data) -> Block {
+    match data {
+        Data::Struct(f) if f.fields.len() == 1 => match f.fields {
+            Fields::Named(fs) => {
+                let name = fs.named[0].ident.as_ref().unwrap();
+                Block {
+                    brace_token: Default::default(),
+                    stmts: Vec::from([Stmt::Expr(
+                        parse_quote! {
+                            webar_data::ser::Serialize::serialize(&self.#name, #serializer)
+                        },
+                        None,
+                    )]),
+                }
+            }
+            Fields::Unnamed(_) => Block {
+                brace_token: Default::default(),
+                stmts: Vec::from([Stmt::Expr(
+                    parse_quote! {
+                        webar_data::ser::Serialize::serialize(&self.0, #serializer)
+                    },
+                    None,
+                )]),
+            },
+            Fields::Unit => panic!("transparent deserialize unit struct is not supported"),
+        },
+        Data::Struct(_) => panic!("transparent deserialize require strust has only one field"),
+        Data::Enum(_) => {
+            panic!("transparent deserialize enum is not supported")
+        }
+        Data::Union(_) => panic!("union is not supported"),
+    }
+}
+
 fn ident_path(ident: Ident) -> Path {
     Path {
         leading_colon: None,
@@ -474,15 +510,19 @@ fn instantiate_type(g: Punctuated<GenericParam, Comma>, ident: Ident) -> Type {
 pub fn derive_serialize(input: DeriveInput) -> TokenStream {
     let options = Options::from_attributes(&input.attrs).unwrap();
     let serializer = Ident::new("serializer", Span::call_site());
-    let body = match input.data {
-        Data::Enum(e) => derive_enum(&serializer, e),
-        Data::Struct(s) => match s.fields {
-            Fields::Named(n) => derive_struct(&serializer, n),
-            Fields::Unnamed(u) => derive_tuple_struct(&serializer, u),
-            Fields::Unit => panic!("Unit struct is not supported"),
-        },
-        Data::Union(_) => {
-            panic!("Union is not supported")
+    let body = if options.transparent {
+        derive_transparent(&serializer, input.data)
+    } else {
+        match input.data {
+            Data::Enum(e) => derive_enum(&serializer, e),
+            Data::Struct(s) => match s.fields {
+                Fields::Named(n) => derive_struct(&serializer, n),
+                Fields::Unnamed(u) => derive_tuple_struct(&serializer, u),
+                Fields::Unit => panic!("Unit struct is not supported"),
+            },
+            Data::Union(_) => {
+                panic!("Union is not supported")
+            }
         }
     };
     let imp = ItemImpl {
