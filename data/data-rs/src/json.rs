@@ -3,6 +3,7 @@
 
 use std::io;
 
+use serde::Deserialize;
 use serde_json::ser::{CharEscape, CompactFormatter, Formatter};
 
 #[derive(Clone, Copy)]
@@ -695,6 +696,62 @@ impl<'a, W: io::Write> crate::ser::Serializer for &'a mut Serializer<W> {
             serializer: self,
             first: true,
         }))
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(transparent)]
+pub struct RawValue(pub serde_json::Value);
+impl RawValue {
+    fn into_formatter<W: io::Write>(
+        self,
+        formatter: &mut CompactFormatter,
+        writer: &mut W,
+    ) -> io::Result<()> {
+        use serde_json::Value;
+        match self.0 {
+            Value::Null => formatter.write_null(writer),
+            Value::Bool(b) => formatter.write_bool(writer, b),
+            Value::Number(n) => formatter.write_number_str(writer, n.as_str()),
+            Value::String(s) => format_escaped_str(writer, formatter, s.as_str()),
+            Value::Array(a) => {
+                formatter.begin_array(writer)?;
+                let mut first = true;
+                for v in a {
+                    formatter.begin_array_value(writer, first)?;
+                    RawValue(v).into_formatter(formatter, writer)?;
+                    formatter.end_array_value(writer)?;
+                    first = false;
+                }
+                formatter.end_array(writer)
+            }
+            Value::Object(o) => {
+                let mut keys: Vec<_> = o.into_iter().collect();
+                keys.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                let mut first = true;
+                formatter.begin_object(writer)?;
+                for (k, v) in keys {
+                    formatter.begin_object_key(writer, first)?;
+                    format_escaped_str(writer, formatter, k.as_str())?;
+                    formatter.end_object_key(writer)?;
+
+                    formatter.begin_object_value(writer)?;
+                    RawValue(v).into_formatter(formatter, writer)?;
+                    formatter.end_object_value(writer)?;
+                    first = false;
+                }
+                formatter.end_object(writer)
+            }
+        }
+    }
+    pub fn into_vec(self) -> Vec<u8> {
+        let mut ret = Vec::new();
+        self.into_formatter(&mut CompactFormatter, &mut ret)
+            .unwrap();
+        ret
+    }
+    pub fn into_string(self) -> String {
+        unsafe { String::from_utf8_unchecked(self.into_vec()) }
     }
 }
 
