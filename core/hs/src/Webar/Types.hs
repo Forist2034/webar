@@ -6,8 +6,8 @@ import Data.Word (Word32, Word64)
 import Webar.Data.TH
 
 data Timestamp = Timestamp
-  { tsSeconds :: {-# UNPACK #-} !Word64,
-    tsNanoseconds :: {-# UNPACK #-} !Word32
+  { tsSecs :: {-# UNPACK #-} !Word64,
+    tsNanos :: {-# UNPACK #-} !Word32
   }
   deriving (Show, Eq, Ord)
 

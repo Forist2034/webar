@@ -38,10 +38,7 @@ mod digest {
 #[test]
 fn timestamp_0() {
     test_serde(
-        Timestamp {
-            seconds: 0,
-            nanoseconds: 0,
-        },
+        Timestamp { secs: 0, nanos: 0 },
         include_bytes!("./cbor/timestamp_0.bin"),
     )
 }
@@ -50,8 +47,8 @@ fn timestamp_0() {
 fn timestamp_1980() {
     test_serde(
         Timestamp {
-            seconds: 315664496,
-            nanoseconds: 123400000,
+            secs: 315664496,
+            nanos: 123400000,
         },
         include_bytes!("./cbor/timestamp_1980.bin"),
     )

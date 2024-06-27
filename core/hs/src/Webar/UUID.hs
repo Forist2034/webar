@@ -12,7 +12,7 @@ import Webar.Types (Timestamp (..))
 
 buildV7 :: Timestamp -> Word16 -> Word64 -> UUID
 buildV7 ts randA randB =
-  let ms = tsSeconds ts * 1_000 + fromIntegral (tsNanoseconds ts `div` 1_000_000)
+  let ms = tsSecs ts * 1_000 + fromIntegral (tsNanos ts `div` 1_000_000)
       randBH = fromIntegral (randB `unsafeShiftR` 32)
       randBL = fromIntegral (randB .&. 0xffff_ffff)
    in U.buildFromWords

@@ -39,10 +39,10 @@ digest = describe "Webar.Digest" do
 miscTypes :: Spec
 miscTypes = describe "Webar.Types" do
   describe "Timestamp" do
-    mkTest "zero" Timestamp {tsSeconds = 0, tsNanoseconds = 0} "timestamp_0"
+    mkTest "zero" Timestamp {tsSecs = 0, tsNanos = 0} "timestamp_0"
     mkTest -- 1980-01-02T12:34:56.1234Z
       "1980"
-      Timestamp {tsSeconds = 315664496, tsNanoseconds = 123400000}
+      Timestamp {tsSecs = 315664496, tsNanos = 123400000}
       "timestamp_1980"
 
 main :: IO ()
