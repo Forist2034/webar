@@ -182,6 +182,10 @@ impl<'a, W: Write> Serializer for &'a mut Encoder<W> {
         value.serialize(self)
     }
 
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        self.0.push(Header::Simple(simple::NULL))
+    }
+
     fn serialize_unit_variant(
         self,
         // name: &'static str,

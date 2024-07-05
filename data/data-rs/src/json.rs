@@ -391,6 +391,10 @@ impl<'a, W: io::Write> crate::ser::Serializer for KeySerializer<'a, W> {
         Err(Error::NonStringKey)
     }
 
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        Err(Error::NonStringKey)
+    }
+
     fn serialize_list(self, _: usize) -> Result<Self::SerializeList, Self::Error> {
         Err(Error::NonStringKey)
     }
@@ -605,6 +609,12 @@ impl<'a, W: io::Write> crate::ser::Serializer for &'a mut Serializer<W> {
         value.serialize(self)
     }
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        self.formatter
+            .write_null(&mut self.writer)
+            .map_err(Error::Io)
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
         self.formatter
             .write_null(&mut self.writer)
             .map_err(Error::Io)

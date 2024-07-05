@@ -4,7 +4,7 @@
 //! Floating point is not supported due to complexity of making floating point
 //! operation reproducible across different machine and languages.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub trait SerializeList {
     type Ok;
@@ -117,7 +117,7 @@ pub trait Serializer: Sized {
     where
         T: ?Sized + Serialize;
 
-    // fn serialize_unit(self) -> Result<Self::Ok, Self::Error>;
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error>;
     // fn serialize_unit_struct(self, name: &'static str) -> Result<Self::Ok, Self::Error>;
     fn serialize_unit_variant(
         self,
@@ -208,6 +208,21 @@ impl Serialize for Never {
         match *self {}
     }
 }
+impl<'de> serde::de::Deserialize<'de> for Never {
+    fn deserialize<D>(_: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+        Err(D::Error::custom("never type should not exist"))
+    }
+}
+
+impl Serialize for () {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_unit()
+    }
+}
 
 impl Serialize for str {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -257,6 +272,15 @@ impl<I: Serialize> Serialize for BTreeSet<I> {
             seq.serialize_element(i)?;
         }
         seq.end()
+    }
+}
+impl<K: Serialize, V: Serialize> Serialize for BTreeMap<K, V> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut ser = serializer.serialize_map(self.len())?;
+        for (k, v) in self.iter() {
+            ser.serialize_entry(k, v)?;
+        }
+        ser.end()
     }
 }
 
