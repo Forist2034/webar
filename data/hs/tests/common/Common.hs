@@ -25,11 +25,15 @@ module Common
     unarySum,
     SumMixed,
     mixedSum,
+    setTests,
+    mapTests,
     uuidTests,
   )
 where
 
 import Data.Int
+import qualified Data.Map.Strict as M
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.UUID.Types as UUID
 import qualified Data.Vector as V
@@ -294,6 +298,16 @@ mixedSum mkTest = describe "mixed" do
   mkTest "tup" (MvTup False True) "var_mv_tup"
   mkTest "unary" (MvNewt (-10)) "var_mv_newt"
   mkTest "record" MvStruct {mvsC = -1, mvsAc = True, mvsAb = "a"} "var_mv_struct"
+
+setTests :: DataTests (S.Set Int32)
+setTests mkTest = describe "set" do
+  mkTest "empty" S.empty "set_empty"
+  mkTest "example" (S.fromList [1, 2, 3]) "set_example"
+
+mapTests :: DataTests (M.Map Word8 Bool)
+mapTests mkTest = describe "map" do
+  mkTest "empty" M.empty "map_empty"
+  mkTest "example" (M.fromList [(1, True), (2, False), (3, True)]) "map_example"
 
 uuidTests :: DataTests UUID.UUID
 uuidTests mkTest = describe "uuid" do

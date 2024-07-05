@@ -485,3 +485,29 @@ mod uuid {
         test_serde(uuid::T1, include_bytes!("./data/uuid_1.bin"))
     }
 }
+
+mod set {
+    use crate::{common::set, test_serde};
+
+    #[test]
+    fn empty() {
+        test_serde(set::empty(), include_bytes!("./data/set_empty.bin"))
+    }
+    #[test]
+    fn example() {
+        test_serde(set::example(), include_bytes!("./data/set_example.bin"))
+    }
+}
+
+mod map {
+    use crate::{common::map, test_serde};
+
+    #[test]
+    fn empty() {
+        test_serde(map::empty(), include_bytes!("./data/map_empty.bin"))
+    }
+    #[test]
+    fn example() {
+        test_serde(map::example(), include_bytes!("./data/map_example.bin"))
+    }
+}

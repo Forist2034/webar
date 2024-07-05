@@ -140,3 +140,5 @@ main = hspec do
     unarySum mkTest
     mixedSum mkTest
   uuidTests mkTest
+  setTests mkTest
+  mapTests mkTest

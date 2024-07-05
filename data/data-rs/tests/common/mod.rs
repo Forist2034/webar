@@ -221,3 +221,25 @@ pub mod uuid {
     pub const NIL: Uuid = Uuid::nil();
     pub const T1: Uuid = uuid::uuid!("c2cc10e1-57d6-4b6f-9899-38d972112d8c");
 }
+
+pub mod set {
+    use std::collections::BTreeSet;
+
+    pub fn empty() -> BTreeSet<i32> {
+        BTreeSet::new()
+    }
+    pub fn example() -> BTreeSet<i32> {
+        BTreeSet::from([1, 2, 3])
+    }
+}
+
+pub mod map {
+    use std::collections::BTreeMap;
+
+    pub fn empty() -> BTreeMap<u8, bool> {
+        BTreeMap::new()
+    }
+    pub fn example() -> BTreeMap<u8, bool> {
+        BTreeMap::from([(1, true), (2, false), (3, true)])
+    }
+}

@@ -20,6 +20,7 @@ import Control.Exception (Exception, throw)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.Int
+import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.UUID.Types as UUID
@@ -92,6 +93,12 @@ instance ToCbor Int where
 instance FromCbor Int where
   fromCbor = decodeInt
 
+instance ToCbor () where
+  toCbor _ = encodeNull
+
+instance FromCbor () where
+  fromCbor = decodeNull
+
 instance ToCbor Text where
   toCbor = encodeString
 
@@ -149,6 +156,22 @@ instance (Ord a, FromCbor a) => FromCbor (S.Set a) where
       go acc n =
         fromCbor >>= \h ->
           go (S.insert h acc) (n - 1)
+
+instance (Ord k, ToCbor k, ToCbor v) => ToCbor (M.Map k v) where
+  toCbor m =
+    M.foldlWithKey'
+      (\e k v -> e <> toCbor k <> toCbor v)
+      (encodeMapLen (fromIntegral (M.size m)))
+      m
+
+instance (Ord k, FromCbor k, FromCbor v) => FromCbor (M.Map k v) where
+  fromCbor = decodeMapLen >>= go M.empty
+    where
+      go acc 0 = pure acc
+      go acc n = do
+        k <- fromCbor
+        v <- fromCbor
+        go (M.insert k v acc) (n - 1)
 
 encodeStrictBs :: (ToCbor a) => a -> ByteString
 encodeStrictBs a = toStrictByteString (toCbor a)

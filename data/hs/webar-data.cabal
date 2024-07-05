@@ -44,6 +44,7 @@ library test-common
         text >=2.0.2 && <2.1,
         bytestring >=0.11.5 && <0.12,
         vector >=0.13.1 && <0.14,
+        containers >=0.6.7 && <0.7,
         uuid-types >=1.0.5 && <1.1,
         hspec >=2.11 && <2.12,
         webar-data

@@ -114,6 +114,9 @@ instance ToJSON Bool where
 instance ToJSON Text where
   toJson = text
 
+instance ToJSON () where
+  toJson _ = null_
+
 instance ToJSONKey UUID.UUID where
   toJsonKey u = text (UUID.toText u)
 

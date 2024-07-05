@@ -287,3 +287,29 @@ mod uuid {
         test_serde(uuid::T1, include_str!("./data/uuid_1.json"))
     }
 }
+
+mod set {
+    use crate::{common::set, test_serde};
+
+    #[test]
+    fn empty() {
+        test_serde(set::empty(), include_str!("./data/set_empty.json"))
+    }
+    #[test]
+    fn example() {
+        test_serde(set::example(), include_str!("./data/set_example.json"))
+    }
+}
+
+mod map {
+    use crate::{common::map, test_serde};
+
+    #[test]
+    fn empty() {
+        test_serde(map::empty(), include_str!("./data/map_empty.json"))
+    }
+    #[test]
+    fn example() {
+        test_serde(map::example(), include_str!("./data/map_example.json"))
+    }
+}
