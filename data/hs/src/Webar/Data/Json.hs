@@ -1,31 +1,79 @@
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+
 -- | canonicalized json interface
 -- based on rfc8785, with integers written as decimal
 module Webar.Data.Json
-  ( ToJSON (..),
+  ( ToJSONKey (..),
+    ToJSON (..),
+    Aeson.FromJSONKey (..),
     Aeson.FromJSON (..),
+    RawValue (..),
     encodeBuilder,
     encodeLazyBs,
     encodeStrictBs,
+    valueToLazyBs,
+    valueToStrictBs,
     decodeLazyBS,
     decodeStrictBs,
+    decodeRawValue,
   )
 where
 
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Decoding
 import Data.Aeson.Encoding
+import qualified Data.Aeson.KeyMap as KM
+import qualified Data.Aeson.RFC8785 as Aeson
+import qualified Data.Aeson.Types as Aeson
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as LBS
 import Data.Int
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IS
+import qualified Data.Map.Strict as M
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.UUID.Types as UUID
 import qualified Data.Vector as V
 import Data.Word
+
+class ToJSONKey a where
+  toJsonKey :: a -> Encoding' KM.Key
+
+instance ToJSONKey Int where
+  toJsonKey = intText
+
+instance ToJSONKey Int8 where
+  toJsonKey = int8Text
+
+instance ToJSONKey Int16 where
+  toJsonKey = int16Text
+
+instance ToJSONKey Int32 where
+  toJsonKey = int32Text
+
+instance ToJSONKey Int64 where
+  toJsonKey = int64Text
+
+instance ToJSONKey Word where
+  toJsonKey = wordText
+
+instance ToJSONKey Word8 where
+  toJsonKey = word8Text
+
+instance ToJSONKey Word16 where
+  toJsonKey = word16Text
+
+instance ToJSONKey Word32 where
+  toJsonKey = word32Text
+
+instance ToJSONKey Word64 where
+  toJsonKey = word64Text
+
+instance ToJSONKey Text where
+  toJsonKey = text
 
 class ToJSON a where
   toJson :: a -> Encoding
@@ -66,6 +114,9 @@ instance ToJSON Bool where
 instance ToJSON Text where
   toJson = text
 
+instance ToJSONKey UUID.UUID where
+  toJsonKey u = text (UUID.toText u)
+
 instance ToJSON UUID.UUID where
   toJson u = text (UUID.toText u)
 
@@ -82,6 +133,18 @@ instance ToJSON IntSet where
 instance (ToJSON a) => ToJSON (V.Vector a) where
   toJson v = list toJson (V.toList v)
 
+instance (ToJSONKey k, ToJSON v) => ToJSON (M.Map k v) where
+  toJson m =
+    pairs
+      ( M.foldlWithKey'
+          (\e k v -> e <> pair' (toJsonKey k) (toJson v))
+          mempty
+          m
+      )
+
+newtype RawValue = RawValue Aeson.Value
+  deriving (Show, Eq, Aeson.FromJSON)
+
 encodeBuilder :: (ToJSON a) => a -> BSB.Builder
 encodeBuilder v = fromEncoding (toJson v)
 
@@ -91,8 +154,17 @@ encodeLazyBs = BSB.toLazyByteString . encodeBuilder
 encodeStrictBs :: (ToJSON a) => a -> BS.ByteString
 encodeStrictBs = LBS.toStrict . encodeLazyBs
 
+valueToLazyBs :: RawValue -> LBS.ByteString
+valueToLazyBs (RawValue v) = Aeson.encodeCanonical v
+
+valueToStrictBs :: RawValue -> BS.ByteString
+valueToStrictBs = LBS.toStrict . valueToLazyBs
+
 decodeLazyBS :: (Aeson.FromJSON a) => LBS.ByteString -> Either String a
 decodeLazyBS = eitherDecode
 
 decodeStrictBs :: (Aeson.FromJSON a) => BS.ByteString -> Either String a
 decodeStrictBs = eitherDecodeStrict
+
+decodeRawValue :: (Aeson.FromJSON a) => RawValue -> Either String a
+decodeRawValue (RawValue v) = Aeson.parseEither Aeson.parseJSON v

@@ -5,7 +5,9 @@ module Webar.Data.Cbor
     FromCbor (..),
     encodeStrictBs,
     decodeLazyBs,
+    decodeStrictBs,
     decodeLazyBsThrow,
+    decodeStrictBsThrow,
   )
 where
 
@@ -154,6 +156,9 @@ encodeStrictBs a = toStrictByteString (toCbor a)
 decodeLazyBs :: (FromCbor a) => LBS.ByteString -> Either DeserialiseFailure (LBS.ByteString, a)
 decodeLazyBs = deserialiseFromBytes fromCbor
 
+decodeStrictBs :: (FromCbor a) => ByteString -> Either DeserialiseFailure (LBS.ByteString, a)
+decodeStrictBs = decodeLazyBs . LBS.fromStrict
+
 newtype DecodeError = DecodeFailure DeserialiseFailure
   deriving (Show)
 
@@ -161,5 +166,10 @@ instance Exception DecodeError
 
 decodeLazyBsThrow :: (FromCbor a) => LBS.ByteString -> a
 decodeLazyBsThrow b = case decodeLazyBs b of
+  Right (_, v) -> v
+  Left e -> throw (DecodeFailure e)
+
+decodeStrictBsThrow :: (FromCbor a) => ByteString -> a
+decodeStrictBsThrow b = case decodeStrictBs b of
   Right (_, v) -> v
   Left e -> throw (DecodeFailure e)
