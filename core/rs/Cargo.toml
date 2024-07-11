@@ -8,8 +8,11 @@ license.workspace = true
 
 [dependencies]
 serde.workspace = true
-const-hex = { version = "1.11.3", features = ["serde"] }
+phf.workspace = true
+const-hex = { workspace = true, features = ["serde"] }
 webar-data.workspace = true
+sha2.workspace = true
+http = "1.1.0"
 
 [dev-dependencies]
 ciborium.workspace = true

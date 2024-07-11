@@ -6,6 +6,12 @@ use webar_data::ser::Serialize;
 
 pub mod digest;
 
+pub mod http;
+
+pub mod fetch {
+    pub mod http;
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Timestamp {
     pub secs: u64,
@@ -24,4 +30,9 @@ impl From<SystemTime> for Timestamp {
             nanos: d.subsec_nanos(),
         }
     }
+}
+
+pub struct FilePath {
+    pub path: &'static str,
+    pub c_path: &'static std::ffi::CStr,
 }

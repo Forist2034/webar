@@ -55,9 +55,14 @@ fn show_hash(d: &[u8], f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     Ok(())
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
-#[serde(transparent)]
-pub struct Sha256(#[serde(deserialize_with = "serde_digest::deserialize")] pub [u8; 32]);
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Sha256(pub [u8; 32]);
+impl Sha256 {
+    pub fn digest(data: impl AsRef<[u8]>) -> Self {
+        use sha2::Digest;
+        Self(sha2::Sha256::digest(data).into())
+    }
+}
 impl Debug for Sha256 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         show_hash(&self.0, f)
@@ -71,6 +76,14 @@ impl Display for Sha256 {
 impl Serialize for Sha256 {
     fn serialize<S: webar_data::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serde_digest::serialize::<64, 32, _>(&self.0, serializer)
+    }
+}
+impl<'de> serde::Deserialize<'de> for Sha256 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        serde_digest::deserialize(deserializer).map(Self)
     }
 }
 

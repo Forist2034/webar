@@ -15,14 +15,18 @@ library
         Webar.Digest
         Webar.Types
         Webar.UUID
+        Webar.Http
+        Webar.Fetch.Http
 
-    hs-source-dirs:   src
-    default-language: Haskell2010
-    ghc-options:      -Wall
+    hs-source-dirs:     src
+    default-language:   Haskell2010
+    default-extensions: StrictData
+    ghc-options:        -Wall
     build-depends:
         base >=4.17.2 && <4.19,
         text >=2.0.2 && <2.1,
         bytestring >=0.11.5 && <0.12,
+        vector >=0.13.1 && <0.14,
         memory >=0.18.0 && <0.19,
         aeson >=2.2.1 && <2.3,
         cborg >=0.2.10 && <0.3,
