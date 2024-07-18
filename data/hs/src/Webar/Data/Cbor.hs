@@ -3,6 +3,8 @@
 module Webar.Data.Cbor
   ( ToCbor (..),
     FromCbor (..),
+    encodeBuilder,
+    encodeLazyBs,
     encodeStrictBs,
     decodeLazyBs,
     decodeStrictBs,
@@ -18,6 +20,7 @@ import Codec.CBOR.Write
 import Control.Applicative (Applicative (liftA2))
 import Control.Exception (Exception, throw)
 import Data.ByteString (ByteString)
+import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as LBS
 import Data.Int
 import qualified Data.Map.Strict as M
@@ -172,6 +175,12 @@ instance (Ord k, FromCbor k, FromCbor v) => FromCbor (M.Map k v) where
         k <- fromCbor
         v <- fromCbor
         go (M.insert k v acc) (n - 1)
+
+encodeBuilder :: (ToCbor a) => a -> BSB.Builder
+encodeBuilder a = toBuilder (toCbor a)
+
+encodeLazyBs :: (ToCbor a) => a -> LBS.ByteString
+encodeLazyBs a = toLazyByteString (toCbor a)
 
 encodeStrictBs :: (ToCbor a) => a -> ByteString
 encodeStrictBs a = toStrictByteString (toCbor a)

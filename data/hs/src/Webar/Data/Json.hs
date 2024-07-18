@@ -1,5 +1,3 @@
-{-# LANGUAGE GeneralisedNewtypeDeriving #-}
-
 -- | canonicalized json interface
 -- based on rfc8785, with integers written as decimal
 module Webar.Data.Json
@@ -7,15 +5,11 @@ module Webar.Data.Json
     ToJSON (..),
     Aeson.FromJSONKey (..),
     Aeson.FromJSON (..),
-    RawValue (..),
     encodeBuilder,
     encodeLazyBs,
     encodeStrictBs,
-    valueToLazyBs,
-    valueToStrictBs,
     decodeLazyBS,
     decodeStrictBs,
-    decodeRawValue,
   )
 where
 
@@ -23,8 +17,6 @@ import qualified Data.Aeson as Aeson
 import Data.Aeson.Decoding
 import Data.Aeson.Encoding
 import qualified Data.Aeson.KeyMap as KM
-import qualified Data.Aeson.RFC8785 as Aeson
-import qualified Data.Aeson.Types as Aeson
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as LBS
@@ -145,9 +137,6 @@ instance (ToJSONKey k, ToJSON v) => ToJSON (M.Map k v) where
           m
       )
 
-newtype RawValue = RawValue Aeson.Value
-  deriving (Show, Eq, Aeson.FromJSON)
-
 encodeBuilder :: (ToJSON a) => a -> BSB.Builder
 encodeBuilder v = fromEncoding (toJson v)
 
@@ -157,17 +146,8 @@ encodeLazyBs = BSB.toLazyByteString . encodeBuilder
 encodeStrictBs :: (ToJSON a) => a -> BS.ByteString
 encodeStrictBs = LBS.toStrict . encodeLazyBs
 
-valueToLazyBs :: RawValue -> LBS.ByteString
-valueToLazyBs (RawValue v) = Aeson.encodeCanonical v
-
-valueToStrictBs :: RawValue -> BS.ByteString
-valueToStrictBs = LBS.toStrict . valueToLazyBs
-
 decodeLazyBS :: (Aeson.FromJSON a) => LBS.ByteString -> Either String a
 decodeLazyBS = eitherDecode
 
 decodeStrictBs :: (Aeson.FromJSON a) => BS.ByteString -> Either String a
 decodeStrictBs = eitherDecodeStrict
-
-decodeRawValue :: (Aeson.FromJSON a) => RawValue -> Either String a
-decodeRawValue (RawValue v) = Aeson.parseEither Aeson.parseJSON v
