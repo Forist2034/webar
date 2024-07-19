@@ -4,6 +4,7 @@
 
 module Webar.Digest
   ( Sha256 (..),
+    sha256Hash,
     Digest (..),
   )
 where
@@ -51,6 +52,9 @@ digestFromCbor msg =
 
 newtype Sha256 = Sha256 (H.Digest H.SHA256)
   deriving (Show, Eq, Ord)
+
+sha256Hash :: (BA.ByteArrayAccess ba) => ba -> Sha256
+sha256Hash ba = Sha256 (H.hash ba)
 
 instance ToJSON Sha256 where
   toJson (Sha256 d) = digestToJson d

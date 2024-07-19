@@ -1,3 +1,4 @@
 packages:
   ./data/hs/webar-data.cabal
   ./core/hs/webar-core.cabal
+  ./server/stackexchange/hs/webar-stackexchange.cabal

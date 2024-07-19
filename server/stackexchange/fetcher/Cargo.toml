@@ -1,0 +1,29 @@
+[package]
+name = "webar-stackexchange-fetcher"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+ciborium.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+thiserror.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+tar.workspace = true
+hex-literal.workspace = true
+webar-core.workspace = true
+webar-data.workspace = true
+webar-stackexchange-core.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+reqwest = { workspace = true, features = ["http2", "rustls-tls-manual-roots"] }
+rustix.workspace = true
+webar-rustls.workspace = true
+webar-tracing.workspace = true

@@ -1,6 +1,15 @@
 [workspace]
 resolver = "2"
-members = ["./data/derive-rs", "./data/data-rs", "./core/rs"]
+members = [
+  "./data/derive-rs",
+  "./data/data-rs",
+  "./core/rs",
+  "./util-rs/rustls",
+  "./util-rs/tracing",
+  "./server/stackexchange/core-rs",
+  "./server/stackexchange/create-filter",
+  "./server/stackexchange/fetcher",
+]
 
 
 [workspace.package]
@@ -13,11 +22,26 @@ serde_json = { version = "1.0.116", features = [
   "preserve_order",
 ] }
 ciborium = "0.2.2"
+rustix = { version = "0.38.34", features = ["fs"] }
 uuid = { version = "1.8.0", features = ["serde"] }
+reqwest = { version = "0.12.4", default-features = false, features = [
+  "gzip",
+  "json",
+] }
+tokio = { version = "1.38.0", features = ["rt", "rt-multi-thread"] }
 sha2 = "0.10.8"
 phf = { version = "0.11.2", features = ["macros"] }
 hex-literal = "0.4.1"
 const-hex = "1.11.3"
+tracing = "0.1.40"
+anyhow = "1.0.83"
+thiserror = "1.0.61"
+tar = "0.4.40"
+
 # projects
 webar-data = { path = "./data/data-rs" }
 webar-core = { path = "./core/rs" }
+webar-tracing = { path = "./util-rs/tracing" }
+webar-rustls = { path = "./util-rs/rustls" }
+webar-stackexchange-core = { path = "./server/stackexchange/core-rs" }
+webar-stackexchange-fetcher = { path = "./server/stackexchange/fetcher" }
