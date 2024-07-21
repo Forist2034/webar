@@ -3,8 +3,9 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Webar.Digest
-  ( Sha256 (..),
+  ( Sha256,
     sha256Hash,
+    sha256ToString,
     Digest (..),
   )
 where
@@ -67,6 +68,9 @@ instance ToCbor Sha256 where
 
 instance FromCbor Sha256 where
   fromCbor = coerce (digestFromCbor @H.SHA256 "invalid sha256 digest")
+
+sha256ToString :: Sha256 -> String
+sha256ToString (Sha256 s) = show s
 
 newtype Digest = DSha256 Sha256
   deriving (Show, Eq, Ord)

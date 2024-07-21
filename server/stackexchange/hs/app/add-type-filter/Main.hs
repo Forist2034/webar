@@ -68,9 +68,9 @@ typeMapToRust tm =
         <> LTB.fromText (fiName fi)
         <> "\",id: "
         <> ( case fiId fi of
-               FilterId (DSha256 (Sha256 d)) ->
+               FilterId (DSha256 d) ->
                  "FilterId(Digest::Sha256(Sha256(hex!(\""
-                   <> LTB.fromString (show d)
+                   <> LTB.fromString (sha256ToString d)
                    <> "\"))))"
            )
         <> "}"
@@ -89,8 +89,8 @@ addFilter root resp = do
     Right (Wrapper v) -> pure v
     Left e -> fail ("failed to decode response: " ++ e)
   let encoded = Cbor.encodeStrictBs bv
-      sha256@(Sha256 d) = sha256Hash encoded
-  dir <- (root </>) <$> encodeFS (show d)
+      sha256 = sha256Hash encoded
+  dir <- (root </>) <$> encodeFS (sha256ToString sha256)
   exists <- fileExist dir
   unless
     exists
