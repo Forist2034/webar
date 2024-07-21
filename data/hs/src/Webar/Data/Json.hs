@@ -10,9 +10,13 @@ module Webar.Data.Json
     encodeStrictBs,
     decodeLazyBS,
     decodeStrictBs,
+    JsonError,
+    decodeLazyBsThrow,
+    decodeStrictBsThrow,
   )
 where
 
+import Control.Exception (Exception, throw)
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Decoding
 import Data.Aeson.Encoding
@@ -151,3 +155,18 @@ decodeLazyBS = eitherDecode
 
 decodeStrictBs :: (Aeson.FromJSON a) => BS.ByteString -> Either String a
 decodeStrictBs = eitherDecodeStrict
+
+newtype JsonError = JsonError String
+  deriving (Show)
+
+instance Exception JsonError
+
+decodeStrictBsThrow :: (Aeson.FromJSON a) => BS.ByteString -> a
+decodeStrictBsThrow bs = case decodeStrictBs bs of
+  Right v -> v
+  Left e -> throw (JsonError e)
+
+decodeLazyBsThrow :: (Aeson.FromJSON a) => LBS.ByteString -> a
+decodeLazyBsThrow bs = case decodeLazyBS bs of
+  Right v -> v
+  Left e -> throw (JsonError e)

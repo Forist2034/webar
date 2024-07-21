@@ -8,6 +8,7 @@ module Webar.Data.Cbor
     encodeStrictBs,
     decodeLazyBs,
     decodeStrictBs,
+    CborError,
     decodeLazyBsThrow,
     decodeStrictBsThrow,
   )
@@ -191,10 +192,10 @@ decodeLazyBs = deserialiseFromBytes fromCbor
 decodeStrictBs :: (FromCbor a) => ByteString -> Either DeserialiseFailure (LBS.ByteString, a)
 decodeStrictBs = decodeLazyBs . LBS.fromStrict
 
-newtype DecodeError = DecodeFailure DeserialiseFailure
+newtype CborError = DecodeFailure DeserialiseFailure
   deriving (Show)
 
-instance Exception DecodeError
+instance Exception CborError
 
 decodeLazyBsThrow :: (FromCbor a) => LBS.ByteString -> a
 decodeLazyBsThrow b = case decodeLazyBs b of
