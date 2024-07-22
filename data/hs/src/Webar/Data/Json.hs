@@ -34,6 +34,7 @@ import Data.Text (Text)
 import qualified Data.UUID.Types as UUID
 import qualified Data.Vector as V
 import Data.Word
+import Data.Void
 
 class ToJSONKey a where
   toJsonKey :: a -> Encoding' KM.Key
@@ -112,6 +113,9 @@ instance ToJSON Text where
 
 instance ToJSON () where
   toJson _ = null_
+
+instance ToJSON Void where
+  toJson = absurd
 
 instance ToJSONKey UUID.UUID where
   toJsonKey u = text (UUID.toText u)

@@ -29,6 +29,7 @@ import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.UUID.Types as UUID
 import qualified Data.Vector as V
+import Data.Void
 import Data.Word
 
 class ToCbor a where
@@ -120,6 +121,12 @@ instance ToCbor ByteString where
 
 instance FromCbor ByteString where
   fromCbor = decodeBytesCanonical
+
+instance ToCbor Void where
+  toCbor = absurd
+
+instance FromCbor Void where
+  fromCbor = fail "Void"
 
 instance ToCbor UUID.UUID where
   toCbor u = encodeBytes (LBS.toStrict (UUID.toByteString u))
