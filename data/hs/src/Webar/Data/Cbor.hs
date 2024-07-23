@@ -23,6 +23,7 @@ import Control.Exception (Exception, throw)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as LBS
+import Data.Foldable
 import Data.Int
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -151,11 +152,22 @@ instance (FromCbor a) => FromCbor (Maybe a) where
 instance (ToCbor a) => ToCbor (V.Vector a) where
   toCbor v = V.foldl' (\e a -> e <> toCbor a) (encodeListLen (fromIntegral (V.length v))) v
 
+decodeList :: (FromCbor a) => Int -> Decoder s [a]
+decodeList 0 = pure []
+decodeList n = liftA2 (:) fromCbor (decodeList (n - 1))
+
 instance (FromCbor a) => FromCbor (V.Vector a) where
-  fromCbor = decodeListLen >>= \l -> V.fromListN l <$> go l
-    where
-      go 0 = pure []
-      go n = liftA2 (:) fromCbor (go (n - 1))
+  fromCbor = decodeListLen >>= \l -> V.fromListN l <$> decodeList l
+
+instance (ToCbor a) => ToCbor [a] where
+  toCbor l =
+    foldl'
+      (\e a -> e <> toCbor a)
+      (encodeListLen (fromIntegral (length l)))
+      l
+
+instance (FromCbor a) => FromCbor [a] where
+  fromCbor = decodeListLenCanonical >>= \l -> decodeList l
 
 instance (ToCbor a) => ToCbor (S.Set a) where
   toCbor s = S.foldl' (\e a -> e <> toCbor a) (encodeListLen (fromIntegral (S.size s))) s
