@@ -31,6 +31,7 @@ library
         cborg >=0.2.10 && <0.3,
         uuid-types >=1.0.5 && <1.1,
         cryptonite >=0.30 && <0.31,
+        primitive >=0.9.0 && <0.10,
         webar-data
 
 test-suite data

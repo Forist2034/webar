@@ -2,12 +2,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Webar.Fetch.Http where
+module Webar.Fetch.Http
+  ( FetchId (..),
+    Traffic (..),
+    FetchInfo (..),
+  )
+where
 
 import Webar.Data.Cbor (FromCbor, ToCbor)
 import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
-import Webar.Digest (Digest)
+import Webar.Digest
 import Webar.Types (Timestamp)
 
 newtype FetchId = FetchId Digest
@@ -27,7 +32,7 @@ deriveSumData
     }
   ''Traffic
 
-data TrafficInfo l = TrafficInfo
+data FetchInfo l = FetchInfo
   { tiTimestamp :: Timestamp,
     tiLog :: Digest,
     tiUser :: Maybe l,
@@ -38,4 +43,4 @@ data TrafficInfo l = TrafficInfo
 
 deriveProdData
   ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
-  ''TrafficInfo
+  ''FetchInfo

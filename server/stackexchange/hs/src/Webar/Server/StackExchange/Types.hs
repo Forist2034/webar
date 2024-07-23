@@ -1,7 +1,26 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE StrictData #-}
 
-module Webar.Server.StackExchange.Types where
+module Webar.Server.StackExchange.Types
+  ( AnswerId (..),
+    BadgeId (..),
+    CollectiveSlug (..),
+    CommentId (..),
+    QuestionId (..),
+    PostId (..),
+    TagName (..),
+    UserId (..),
+    RevisionId (..),
+    AccountId (..),
+    FilterId (..),
+    ApiSiteParameter (apiSiteParamToText),
+    LinkUrl (..),
+    HtmlContent (..),
+    MarkdownContent (..),
+    RawText (..),
+    SafeText (..),
+  )
+where
 
 import Data.Int (Int64)
 import Data.Text (Text)
@@ -128,7 +147,7 @@ newtype UserId = UserId Int64
       ToCbor
     )
 
-newtype AccountId = AccountId Word64
+newtype AccountId = AccountId Int64
   deriving
     ( Show,
       Eq,
@@ -144,7 +163,7 @@ newtype AccountId = AccountId Word64
 newtype FilterId = FilterId Digest
   deriving (Show, Eq, Ord, FromJSON, ToJSON, FromCbor, ToCbor)
 
-newtype ApiSiteParameter = ApiSiteParameter Text
+newtype ApiSiteParameter = ApiSiteParameter {apiSiteParamToText :: Text}
   deriving
     ( Show,
       Eq,

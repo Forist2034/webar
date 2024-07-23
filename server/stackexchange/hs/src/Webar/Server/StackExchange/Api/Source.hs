@@ -73,7 +73,7 @@ data ObjectType
   | OtBadge
   | OtCollective
   | OtComment
-  | OtFilter
+  | OtInfo
   | OtQuestion
   | OtRevision
   | OtTag
@@ -172,7 +172,8 @@ deriveSumData
   ''ResponseData
 
 data ApiInfo = ApiInfo
-  { apiCallSeq :: Word32,
+  { apiFetch :: FetchId,
+    apiCallSeq :: Word32,
     apiVersion :: ApiVersion,
     apiSite :: ApiSiteParameter,
     apiTimestamp :: Timestamp,
@@ -181,12 +182,16 @@ data ApiInfo = ApiInfo
   }
   deriving (Show)
 
+deriveProdData
+  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  ''ApiInfo
+
 newtype ApiResponseId = ApiResponseId Digest
   deriving (Show, Eq, Ord, FromJSON, ToJSON, FromCbor, ToCbor)
 
 data SnapshotId = SnapshotId
   { siApiResponse :: ApiResponseId,
-    siIndex :: Maybe Word
+    siIndex :: Maybe Word32
   }
   deriving (Show, Eq, Ord)
 
@@ -206,7 +211,8 @@ deriveSumData
   ''Content
 
 data Metadata = Metadata
-  { metaId :: SnapshotId,
+  { metaFetch :: FetchId,
+    metaId :: SnapshotId,
     metaContent :: Content,
     metaApiVersion :: ApiVersion,
     metaFilter :: FilterId,
@@ -232,7 +238,8 @@ deriveSumData
   ''ListContent
 
 data ListMeta = ListMeta
-  { listId :: ApiResponseId,
+  { listFetch :: FetchId,
+    listId :: ApiResponseId,
     listContent :: ListContent,
     listApiVersion :: ApiVersion,
     listTimestamp :: Timestamp
