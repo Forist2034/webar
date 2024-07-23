@@ -63,7 +63,7 @@ instance ToCbor HeaderMap where
 
 instance FromCbor HeaderMap where
   fromCbor =
-    decodeListLenCanonical
+    decodeMapLenCanonical
       >>= \l -> HeaderMap . V.fromListN l <$> go l
     where
       go 0 = pure []
@@ -80,7 +80,7 @@ data Response i b = Response
     respHeaders :: HeaderMap,
     respBody :: b
   }
-  deriving(Show)
+  deriving (Show)
 
 deriveProdCbor
   ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
