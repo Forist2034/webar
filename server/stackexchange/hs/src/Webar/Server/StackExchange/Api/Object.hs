@@ -97,7 +97,7 @@ deriveFromJSON
   ''UserType
 
 data ShallowUser = ShallowUser
-  { sUsrAccountId :: AccountId,
+  { sUsrAccountId :: Maybe AccountId,
     sUsrUserId :: Maybe UserId,
     sUsrUserType :: UserType
   }
@@ -145,11 +145,11 @@ data Answer = Answer
   { ansAnswerId :: AnswerId,
     ansBody :: HtmlContent,
     ansBodyMarkdown :: MarkdownContent,
-    ansCanComment :: Bool,
-    ansCanEdit :: Bool,
-    ansCanFlag :: Bool,
-    ansCanSuggestEdit :: Bool,
-    ansCollectives :: Vector CollectiveRef,
+    ansCanComment :: Maybe Bool,
+    ansCanEdit :: Maybe Bool,
+    ansCanFlag :: Maybe Bool,
+    ansCanSuggestEdit :: Maybe Bool,
+    ansCollectives :: Maybe (Vector CollectiveRef),
     ansCommunityOwnedDate :: Maybe Date,
     ansContentLicense :: License,
     ansCreationDate :: Date,
@@ -157,11 +157,11 @@ data Answer = Answer
     ansIsAccepted :: Bool,
     ansLastActivityDate :: Date,
     ansLastEditDate :: Maybe Date,
-    ansLastEditor :: ShallowUser,
+    ansLastEditor :: Maybe ShallowUser,
     ansLink :: LinkUrl,
     ansLockedDate :: Maybe Date,
     ansOwner :: Maybe ShallowUser,
-    ansPostedByCollectives :: Vector CollectiveRef,
+    ansPostedByCollectives :: Maybe (Vector CollectiveRef),
     ansQuestionId :: QuestionId,
     ansScore :: Int,
     ansTags :: Tags,
@@ -190,7 +190,7 @@ deriveFromJSON
 data Comment = Comment
   { comBody :: HtmlContent,
     comBodyMarkdown :: MarkdownContent,
-    comCanFlag :: Bool,
+    comCanFlag :: Maybe Bool,
     comCommentId :: CommentId,
     comContentLicense :: License,
     comCreationDate :: Date,
@@ -306,7 +306,7 @@ deriveFromJSON
   ''SiteRelation
 
 data RelatedSite = RelatedSite
-  { rsApiSiteParameter :: ApiSiteParameter,
+  { rsApiSiteParameter :: Maybe ApiSiteParameter,
     rsName :: RawText,
     rsRelation :: SiteRelation,
     rsSiteUrl :: LinkUrl
@@ -335,7 +335,7 @@ data Site = Site
     sitRelatedSites :: Maybe (Vector RelatedSite),
     sitSiteState :: SiteState,
     sitSiteType :: SiteType,
-    sitUrl :: LinkUrl,
+    sitSiteUrl :: LinkUrl,
     sitStyling :: Styling
   }
   deriving (Show)
@@ -389,35 +389,35 @@ deriveFromJSON
 deriveToFilter "notice" 3 ''Notice
 
 data Question = Question
-  { qAcceptedAnswerId :: AnswerId,
+  { qAcceptedAnswerId :: Maybe AnswerId,
     qBody :: HtmlContent,
     qBodyMarkdown :: MarkdownContent,
-    qCanAnswer :: Bool,
-    qCanClose :: Bool,
-    qCanComment :: Bool,
-    qCanEdit :: Bool,
-    qCanFlag :: Bool,
-    qCanSuggestEdit :: Bool,
+    qCanAnswer :: Maybe Bool,
+    qCanClose :: Maybe Bool,
+    qCanComment :: Maybe Bool,
+    qCanEdit :: Maybe Bool,
+    qCanFlag :: Maybe Bool,
+    qCanSuggestEdit :: Maybe Bool,
     qCloseVoteCount :: Word,
     qClosedDate :: Maybe Date,
     qClosedDetails :: Maybe ClosedDetails,
     qClosedReason :: Maybe RawText,
-    qCollectives :: Vector CollectiveRef,
+    qCollectives :: Maybe (Vector CollectiveRef),
     qCommunityOwnedDate :: Maybe Date,
-    qContentLicense :: License,
+    qContentLicense :: Maybe License,
     qCreationDate :: Date,
     qDeleteVoteCount :: Word,
     qDownVoteCount :: Word,
     qLastActivityDate :: Date,
     qLastEditDate :: Maybe Date,
-    qLastEditor :: ShallowUser,
+    qLastEditor :: Maybe ShallowUser,
     qLink :: LinkUrl,
     qLockedDate :: Maybe Date,
     qMigratedFrom :: Maybe MigrationInfo,
     qMigratedTo :: Maybe MigrationInfo,
-    qNotice :: Notice,
+    qNotice :: Maybe Notice,
     qOwner :: Maybe ShallowUser,
-    qPostedByCollectives :: Vector CollectiveRef,
+    qPostedByCollectives :: Maybe (Vector CollectiveRef),
     qProtectedDate :: Maybe Date,
     qQuestionId :: QuestionId,
     qReopenVoteCount :: Word,
@@ -446,8 +446,8 @@ deriveFromJSON
 
 data Revision = Revision
   { revBody :: Maybe HtmlContent,
-    revComment :: HtmlContent,
-    revContentLicense :: License,
+    revComment :: Maybe HtmlContent,
+    revContentLicense :: Maybe License,
     revCreationDate :: Date,
     revIsRollback :: Bool,
     revLastBody :: Maybe HtmlContent,
@@ -456,7 +456,7 @@ data Revision = Revision
     revPostId :: PostId,
     revPostType :: PostType,
     revRevisionGuid :: RevisionId,
-    revRevisionNumber :: Word,
+    revRevisionNumber :: Maybe Word,
     revRevisionType :: RevisionType,
     revSetCommunityWiki :: Bool,
     revTags :: Maybe Tags,
@@ -472,9 +472,9 @@ deriveFromJSON
 deriveToFilter "revision" 3 ''Revision
 
 data Tag = Tag
-  { tagCollectives :: Vector CollectiveRef,
+  { tagCollectives :: Maybe (Vector CollectiveRef),
     tagName :: TagName,
-    tagSynonyms :: Vector TagName
+    tagSynonyms :: Maybe (Vector TagName)
   }
   deriving (Show)
 
@@ -501,7 +501,7 @@ data TagWiki = TagWiki
   { twBody :: HtmlContent,
     twBodyLastEditDate :: Date,
     twExcerpt :: RawText,
-    twExcerptLastEditData :: Date,
+    twExcerptLastEditDate :: Date,
     twLastBodyEditor :: ShallowUser,
     twLastExcerptEditor :: ShallowUser,
     twTagName :: TagName
@@ -540,9 +540,9 @@ deriveFromJSON
 deriveToFilter "collective_membership" 2 ''CollectiveMembership
 
 data User = User
-  { usrAboutMe :: HtmlContent,
+  { usrAboutMe :: Maybe HtmlContent,
     usrAccountId :: AccountId,
-    usrCollectives :: Vector CollectiveMembership,
+    usrCollectives :: Maybe (Vector CollectiveMembership),
     usrCreationDate :: Date,
     useDisplayName :: RawText,
     usrIsEmployee :: Bool,
@@ -552,7 +552,7 @@ data User = User
     usrReputation :: Int,
     usrUserId :: UserId,
     usrUserType :: UserType,
-    usrWebsiteUrl :: LinkUrl
+    usrWebsiteUrl :: Maybe LinkUrl
   }
   deriving (Show)
 
@@ -582,3 +582,10 @@ data Filter = Filter
 deriveFromJSON
   defaultOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''Filter
+
+newtype Wrapper a = Wrapper {wItems :: a}
+  deriving (Show)
+
+deriveFromJSON
+  defaultOptions {fieldLabelModifier = camelTo2 '_' . tail}
+  ''Wrapper

@@ -29,9 +29,9 @@ pub const HS_FILTER_INFO: TypeMap<FilterInfo<&str>> = TypeMap {
         )))),
     },
     info: FilterInfo {
-        name: "1uatltI)ObcWErUeHc(SvZuwP",
+        name: "S9)8yVzYJPOeK*_4YAeTUD",
         id: FilterId(Digest::Sha256(Sha256(hex!(
-            "c0e967adb5e35ce0588069d456843887af2158f168c418facf927958aea2c3ff"
+            "a36f127b64781bdc018593bd81f4ad373bdee2f05b24e7834aa5d184426cfb7e"
         )))),
     },
     question: FilterInfo {
@@ -59,9 +59,9 @@ pub const HS_FILTER_INFO: TypeMap<FilterInfo<&str>> = TypeMap {
         )))),
     },
     tag_wiki: FilterInfo {
-        name: "1w_l8s9RGuxzc_RNLKFY9)7oP",
+        name: "SIUtpsPZ-9l)fUK)qR2IvD",
         id: FilterId(Digest::Sha256(Sha256(hex!(
-            "97e677fbbc625cd2633e1c34e17a154fbca88d9f8034577899ceb1af611f5c72"
+            "b04dcc3850bffa7c194af583600932d997bda0b77dba92429e76174687f7e713"
         )))),
     },
     user: FilterInfo {
