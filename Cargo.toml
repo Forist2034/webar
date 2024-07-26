@@ -4,8 +4,8 @@ members = [
   "./data/derive-rs",
   "./data/data-rs",
   "./core/rs",
-  "./util-rs/rustls",
-  "./util-rs/tracing",
+  "./utils/rs/rustls",
+  "./utils/rs/tracing",
   "./server/stackexchange/core-rs",
   "./server/stackexchange/create-filter",
   "./server/stackexchange/fetcher",
@@ -41,7 +41,7 @@ tar = "0.4.40"
 # projects
 webar-data = { path = "./data/data-rs" }
 webar-core = { path = "./core/rs" }
-webar-tracing = { path = "./util-rs/tracing" }
-webar-rustls = { path = "./util-rs/rustls" }
+webar-tracing = { path = "./utils/rs/tracing" }
+webar-rustls = { path = "./utils/rs/rustls" }
 webar-stackexchange-core = { path = "./server/stackexchange/core-rs" }
 webar-stackexchange-fetcher = { path = "./server/stackexchange/fetcher" }
