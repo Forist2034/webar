@@ -175,3 +175,13 @@ deriveProdData
   ''ApiInfo
 
 type ApiResponseId = ObjectId ApiInfo
+
+data RequestRecord = RrFetch | RrHttpRequest | RrApiResponse
+  deriving (Show, Eq)
+
+deriveSumData
+  SumOptions
+    { sumProduct = ProductOptions {fieldLabelModifier = id},
+      constructorTagModifier = camelTo2 '_' . drop 2
+    }
+  ''RequestRecord

@@ -15,6 +15,7 @@ library
         Webar.Server.StackExchange.Api.Request
         Webar.Server.StackExchange.Api.Model
         Webar.Server.StackExchange.Api.Source
+        Webar.Server.StackExchange.Source
         Webar.Server.StackExchange.Fetcher.ApiClient
 
     hs-source-dirs:     src

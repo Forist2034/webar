@@ -18,8 +18,8 @@ import Webar.Digest
 import Webar.Object
 import Webar.Server.StackExchange.Api.Filter
 import Webar.Server.StackExchange.Api.Model (Filter (..), FilterType (..))
-import Webar.Server.StackExchange.Api.Source
 import Webar.Server.StackExchange.Api.Types
+import Webar.Server.StackExchange.Source
 import qualified Webar.Store.Data.Base as DS.B
 import qualified Webar.Store.Data.WithShared as DS
 import qualified Webar.Store.Object.Base as OS.B

@@ -6,7 +6,7 @@ module Webar.Server.StackExchange.Api.Source where
 
 import Data.Word (Word32)
 import Webar.Data.TH
-import Webar.Object
+import Webar.Object (DataId)
 import Webar.Server.StackExchange.Api.Filter (FilterId)
 import Webar.Server.StackExchange.Api.Request
   ( ApiResponseId,
@@ -14,9 +14,6 @@ import Webar.Server.StackExchange.Api.Request
   )
 import Webar.Server.StackExchange.Api.Types
 import Webar.Types (Timestamp)
-
-server :: Server
-server = Server {serverName = "StackExchange-api", serverVersion = 1}
 
 data ArchiveAnswer
   = AAnsInfo
@@ -98,42 +95,15 @@ deriveSumData
     }
   ''ArchiveSiteData
 
-data ArchiveInfo
-  = AiSite ApiSiteParameter ArchiveSiteData
+data ApiSnapshotType = AstObject | AstList
   deriving (Show, Eq)
 
 deriveSumData
   SumOptions
     { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+      constructorTagModifier = camelTo2 '_' . drop 3
     }
-  ''ArchiveInfo
-
-type ArchiveId = ObjectId ArchiveInfo
-
-data RecordType
-  = RtFetch
-  | RtHttpRequest
-  | RtApiResponse
-  | RtFilter
-  deriving (Show, Eq)
-
-deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
-    }
-  ''RecordType
-
-data SnapshotType = StMetadata | StListMeta
-  deriving (Show, Eq)
-
-deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
-    }
-  ''SnapshotType
+  ''ApiSnapshotType
 
 newtype Content
   = CNormal DataId
@@ -146,20 +116,20 @@ deriveSumData
     }
   ''Content
 
-data Metadata = Metadata
-  { metaFetch :: FetchId,
-    metaApiResponse :: ApiResponseId,
-    metaApiIndex :: Maybe Word32,
-    metaContent :: Content,
-    metaApiVersion :: ApiVersion,
-    metaFilter :: FilterId,
-    metaTimestamp :: Timestamp
+data ObjectMeta = ObjectMeta
+  { objFetch :: FetchId,
+    objApiResponse :: ApiResponseId,
+    objApiIndex :: Maybe Word32,
+    objContent :: Content,
+    objApiVersion :: ApiVersion,
+    objFilter :: FilterId,
+    objTimestamp :: Timestamp
   }
   deriving (Show)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
-  ''Metadata
+  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  ''ObjectMeta
 
 data ListContent = LcNormal
   { lcContent :: DataId,

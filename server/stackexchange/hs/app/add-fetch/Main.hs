@@ -42,6 +42,7 @@ import Webar.Server.StackExchange.Api.Request
 import Webar.Server.StackExchange.Api.Source
 import Webar.Server.StackExchange.Api.Types
 import Webar.Server.StackExchange.Fetcher.ApiClient
+import Webar.Server.StackExchange.Source
 import qualified Webar.Store.Data.Base as DS.B
 import Webar.Store.Data.WithShared (DataStore)
 import qualified Webar.Store.Data.WithShared as DS
@@ -68,7 +69,7 @@ addHttpResponse ctx callSeq respIdx req =
     OS.objectId
       <$> OS.addObject
         ctx.ctxObjectStore
-        (OtRecord RtHttpRequest)
+        (OtRecord (RtApiRequest RrHttpRequest))
         1
         HttpInfo
           { hiUrl = hrUrl req,
@@ -82,7 +83,7 @@ addHttpResponse ctx callSeq respIdx req =
 addApiResponse :: Context -> ApiInfo -> IO ApiResponseId
 addApiResponse ctx resp =
   OS.objectId
-    <$> OS.addObject ctx.ctxObjectStore (OtRecord RtApiResponse) 1 resp
+    <$> OS.addObject ctx.ctxObjectStore (OtRecord (RtApiRequest RrApiResponse)) 1 resp
 
 addSnapshot :: (Cbor.ToCbor a) => Context -> ArchiveInfo -> SnapshotType -> a -> IO ()
 addSnapshot ctx archive ty meta =
@@ -102,16 +103,16 @@ addApiItem ctx meta archive idx bv =
   DS.addByteString ctx.ctxDataStore (Cbor.encodeStrictBs bv) >>= \dat ->
     addSnapshot
       ctx
-      (AiSite meta.imSite archive)
-      StMetadata
-      Metadata
-        { metaFetch = ctx.ctxFetchId,
-          metaApiResponse = meta.imApiResponseId,
-          metaApiIndex = Just idx,
-          metaContent = CNormal dat.dataId,
-          metaApiVersion = meta.imApiVersion,
-          metaFilter = meta.imFilter,
-          metaTimestamp = meta.imTimestamp
+      (AiSiteApi meta.imSite archive)
+      (StApi AstObject)
+      ObjectMeta
+        { objFetch = ctx.ctxFetchId,
+          objApiResponse = meta.imApiResponseId,
+          objApiIndex = Just idx,
+          objContent = CNormal dat.dataId,
+          objApiVersion = meta.imApiVersion,
+          objFilter = meta.imFilter,
+          objTimestamp = meta.imTimestamp
         }
 
 addItemList :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> Bool -> S.Set a -> IO ()
@@ -119,8 +120,8 @@ addItemList ctx meta archive full v =
   DS.addByteString ctx.ctxDataStore (Cbor.encodeStrictBs v) >>= \dat ->
     addSnapshot
       ctx
-      (AiSite meta.imSite archive)
-      StListMeta
+      (AiSiteApi meta.imSite archive)
+      (StApi AstList)
       ListMeta
         { listFetch = ctx.ctxFetchId,
           listApiResponse = meta.imApiResponseId,
@@ -418,7 +419,7 @@ main = do
           storeRoot
           serverRoot
           ( \os -> do
-              fetchId <- addWiresharkFetch os ds RtFetch fetchPath
+              fetchId <- addWiresharkFetch os ds (RtApiRequest RrFetch) fetchPath
               let context =
                     Context
                       { ctxDataStore = ds,
