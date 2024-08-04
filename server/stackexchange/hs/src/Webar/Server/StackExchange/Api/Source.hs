@@ -4,7 +4,6 @@
 
 module Webar.Server.StackExchange.Api.Source where
 
-import Data.Word (Word32)
 import Webar.Data.TH
 import Webar.Object (DataId)
 import Webar.Server.StackExchange.Api.Filter (FilterId)
@@ -119,7 +118,6 @@ deriveSumData
 data ObjectMeta = ObjectMeta
   { objFetch :: FetchId,
     objApiResponse :: ApiResponseId,
-    objApiIndex :: Maybe Word32,
     objContent :: Content,
     objApiVersion :: ApiVersion,
     objFilter :: FilterId,

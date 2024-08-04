@@ -10,7 +10,6 @@
 module Main (main) where
 
 import Control.Exception
-import Control.Monad (zipWithM_)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.TH as Aeson.TH
@@ -21,6 +20,7 @@ import Data.Conduit ((.|))
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Tar as Tar
+import Data.Foldable (traverse_)
 import Data.Functor (void)
 import qualified Data.Map.Strict as M
 import Data.Proxy (Proxy (Proxy))
@@ -98,8 +98,8 @@ data ItemMeta = ItemMeta
     imTimestamp :: !Timestamp
   }
 
-addApiItem :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> Word32 -> a -> IO ()
-addApiItem ctx meta archive idx bv =
+addApiItem :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> a -> IO ()
+addApiItem ctx meta archive bv =
   DS.addByteString ctx.ctxDataStore (Cbor.encodeStrictBs bv) >>= \dat ->
     addSnapshot
       ctx
@@ -108,7 +108,6 @@ addApiItem ctx meta archive idx bv =
       ObjectMeta
         { objFetch = ctx.ctxFetchId,
           objApiResponse = meta.imApiResponseId,
-          objApiIndex = Just idx,
           objContent = CNormal dat.dataId,
           objApiVersion = meta.imApiVersion,
           objFilter = meta.imFilter,
@@ -180,14 +179,14 @@ instance Item Api.User where
   archiveInfo u = AsdUser u.usrUserId AUsrInfo
   itemId = Api.usrUserId
 
-addItem :: forall a. (Item a) => Context -> ItemMeta -> Word32 -> BinJson.WithBinValue a -> IO ()
-addItem ctx meta idx (BinJson.WithBinValue bv obj) =
-  addApiItem ctx meta (archiveInfo obj) idx bv
+addItem :: forall a. (Item a) => Context -> ItemMeta -> BinJson.WithBinValue a -> IO ()
+addItem ctx meta (BinJson.WithBinValue bv obj) =
+  addApiItem ctx meta (archiveInfo obj) bv
 
 addItemsResp :: forall a. (Item a) => Context -> ItemMeta -> Proxy a -> ByteString -> IO ()
 addItemsResp ctx meta _ body =
   Aeson.throwDecodeStrict body >>= \Api.Wrapper {Api.wItems = is} ->
-    V.imapM_ (\idx v -> addItem @a ctx meta (fromIntegral idx) v) is
+    V.mapM_ (addItem @a ctx meta) is
 
 data ListArgs = ListArgs
   { lrMeta :: !ItemMeta,
@@ -207,15 +206,13 @@ addItemListResp ctx (ListArgs meta full resp) archive _ = do
   ids <-
     V.foldM'
       ( \i r ->
-          let startIdx = S.size i
-           in Aeson.throwDecodeStrict (respBody (hrResponse r)) >>= \w ->
-                V.ifoldM'
-                  ( \acc objIdx val@(BinJson.WithBinValue _ obj) ->
-                      S.insert (itemId obj) acc
-                        <$ addItem @a ctx meta (fromIntegral (startIdx + objIdx)) val
-                  )
-                  i
-                  (Api.wItems w)
+          Aeson.throwDecodeStrict (respBody (hrResponse r)) >>= \w ->
+            V.foldM'
+              ( \acc val@(BinJson.WithBinValue _ obj) ->
+                  S.insert (itemId obj) acc <$ addItem @a ctx meta val
+              )
+              i
+              (Api.wItems w)
       )
       S.empty
       resp
@@ -243,9 +240,8 @@ addRevisionListResp ctx (ListArgs meta full resp) archive =
           M.empty
           resp
    in do
-        zipWithM_
-          (\idx (k, v) -> addApiItem ctx meta (AsdRevision k ARevInfo) idx v)
-          [0 ..]
+        traverse_
+          (\(k, v) -> addApiItem ctx meta (AsdRevision k ARevInfo) v)
           (M.toAscList revs)
         addItemList ctx meta archive full (M.keysSet revs)
 
@@ -302,7 +298,7 @@ addEntry ctx bs =
             OtInfo -> do
               Api.Wrapper {Api.wItems = IInfo (Info {infoSite = BinJson.WithBinValue bv _})} <-
                 Aeson.throwDecodeStrict body
-              addApiItem ctx meta AsdInfo 0 bv
+              addApiItem ctx meta AsdInfo bv
             OtQuestion -> addItemsResp @Api.Question ctx meta Proxy body
             OtRevision -> error "revision must be in api list"
             OtTag -> addItemsResp @Api.Tag ctx meta Proxy body
@@ -364,7 +360,7 @@ addEntry ctx bs =
                                 Left e -> throw (Aeson.AesonException e)
                           )
                           resp
-                   in addApiItem ctx meta (AsdRevision revId ARevInfo) 0 content
+                   in addApiItem ctx meta (AsdRevision revId ARevInfo) content
               | otherwise -> error "incomplete revision"
             LrQuestion {lrqId = qId, lrqRequest = qReq} ->
               case qReq of
