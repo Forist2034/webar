@@ -125,6 +125,16 @@ deriveSumData
     }
   ''RecordType
 
+data SnapshotType = StMetadata | StListMeta
+  deriving (Show, Eq)
+
+deriveSumData
+  SumOptions
+    { sumProduct = ProductOptions {fieldLabelModifier = id},
+      constructorTagModifier = camelTo2 '_' . drop 2
+    }
+  ''SnapshotType
+
 newtype Content
   = CNormal DataId
   deriving (Show)

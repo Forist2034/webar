@@ -36,6 +36,9 @@ import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
 import Webar.Digest
 
+-- | data id
+--  Distinguish data and object using different store and id to avoid
+--  collision.
 newtype DataId = DataId Digest
   deriving (Show, Eq, Ord, FromCbor, ToCbor, FromJSON, ToJSON)
 
@@ -56,9 +59,13 @@ instance ToCbor Server where
 newtype ObjectId t = ObjectId Digest
   deriving (Show, Eq, Ord, FromCbor, ToCbor, FromJSON, ToJSON)
 
-data ObjectType archive st
-  = OtSnapshot (ObjectId archive)
-  | OtRecord st
+data ObjectType archive st rt
+  = OtSnapshot
+      { otArchive :: ObjectId archive,
+        -- | snapshot info type
+        otType :: st
+      }
+  | OtRecord rt
   | OtArchive
   deriving (Show, Eq)
 
@@ -69,9 +76,9 @@ deriveSumData
     }
   ''ObjectType
 
-data ObjectInfo h archive st = ObjectInfo
+data ObjectInfo h archive st rt = ObjectInfo
   { oiHost :: h,
-    oiType :: ObjectType archive st,
+    oiType :: ObjectType archive st rt,
     oiVersion :: Word8
   }
   deriving (Show, Eq)
@@ -80,12 +87,17 @@ deriveProdData
   ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''ObjectInfo
 
-encodeObject :: (ToCbor h, ToCbor so, ToCbor b) => Server -> ObjectInfo h a so -> b -> ByteString
+encodeObject ::
+  (ToCbor h, ToCbor so, ToCbor st, ToCbor b) =>
+  Server ->
+  ObjectInfo h a so st ->
+  b ->
+  ByteString
 encodeObject server info body =
   Cbor.toStrictByteString
     ( Cbor.encodeMapLen 4
         <> (Cbor.encodeString "version" <> Cbor.encodeWord 1)
         <> (Cbor.encodeString "server" <> toCbor server)
         <> (Cbor.encodeString "info" <> toCbor info)
-        <> (Cbor.encodeString "body" <> toCbor body)
+        <> (Cbor.encodeString "data" <> toCbor body)
     )

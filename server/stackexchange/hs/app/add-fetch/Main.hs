@@ -37,8 +37,8 @@ import Webar.Fetch.Http.Store (addWiresharkFetch)
 import Webar.Http
 import Webar.Object
 import Webar.Server.StackExchange.Api.Filter (FilterId)
-import Webar.Server.StackExchange.Api.Request
 import qualified Webar.Server.StackExchange.Api.Model as Api
+import Webar.Server.StackExchange.Api.Request
 import Webar.Server.StackExchange.Api.Source
 import Webar.Server.StackExchange.Api.Types
 import Webar.Server.StackExchange.Fetcher.ApiClient
@@ -49,7 +49,7 @@ import qualified Webar.Store.Object.Base as OS.B
 import qualified Webar.Store.Object.Website as OS
 import Webar.Types (Timestamp)
 
-type ObjectStore = OS.ObjectStore () ArchiveInfo RecordType
+type ObjectStore = OS.ObjectStore () ArchiveInfo SnapshotType RecordType
 
 data Context = Context
   { ctxDataStore :: !DataStore,
@@ -84,10 +84,10 @@ addApiResponse ctx resp =
   OS.objectId
     <$> OS.addObject ctx.ctxObjectStore (OtRecord RtApiResponse) 1 resp
 
-addSnapshot :: (Cbor.ToCbor a) => Context -> ArchiveInfo -> a -> IO ()
-addSnapshot ctx archive meta =
+addSnapshot :: (Cbor.ToCbor a) => Context -> ArchiveInfo -> SnapshotType -> a -> IO ()
+addSnapshot ctx archive ty meta =
   OS.addObject ctx.ctxObjectStore OtArchive 1 archive >>= \arch ->
-    void (OS.addObject ctx.ctxObjectStore (OtSnapshot arch.objectId) 1 meta)
+    void (OS.addObject ctx.ctxObjectStore (OtSnapshot arch.objectId ty) 1 meta)
 
 data ItemMeta = ItemMeta
   { imSite :: !ApiSiteParameter,
@@ -103,6 +103,7 @@ addApiItem ctx meta archive idx bv =
     addSnapshot
       ctx
       (AiSite meta.imSite archive)
+      StMetadata
       Metadata
         { metaFetch = ctx.ctxFetchId,
           metaApiResponse = meta.imApiResponseId,
@@ -119,6 +120,7 @@ addItemList ctx meta archive full v =
     addSnapshot
       ctx
       (AiSite meta.imSite archive)
+      StListMeta
       ListMeta
         { listFetch = ctx.ctxFetchId,
           listApiResponse = meta.imApiResponseId,

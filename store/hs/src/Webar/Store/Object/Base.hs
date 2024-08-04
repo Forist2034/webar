@@ -57,10 +57,10 @@ openByFilePath fp =
       P.FilePath.defaultFileFlags {P.FilePath.directory = True}
 
 addObject ::
-  (ToCbor h, ToCbor so, ToCbor o) =>
+  (ToCbor h, ToCbor st, ToCbor rt, ToCbor o) =>
   ObjectStore ->
   Server ->
-  ObjectInfo h a so ->
+  ObjectInfo h a st rt ->
   o ->
   IO (ObjectHandle o)
 addObject (ObjectStore fd) server objInfo cont =

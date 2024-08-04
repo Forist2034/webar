@@ -74,7 +74,7 @@ typeMapToRust tm =
         <> "}"
     field k v = "  " <> k <> ": " <> filterInfo v <> ",\n"
 
-type ObjectStore = OS.ObjectStore () ArchiveInfo RecordType
+type ObjectStore = OS.ObjectStore () ArchiveInfo SnapshotType RecordType
 
 addFilter :: DS.DataStore -> ObjectStore -> ByteString -> IO FilterSpec
 addFilter dataStore objStore resp = do

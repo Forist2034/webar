@@ -57,10 +57,10 @@ fetchInfo store p = do
     )
 
 addWiresharkFetch ::
-  (FromJSON l, ToCbor h, ToCbor so, ToCbor l) =>
-  OS.ObjectStore h a so ->
+  (FromJSON l, ToCbor h, ToCbor st, ToCbor rt, ToCbor l) =>
+  OS.ObjectStore h a st rt ->
   DS.DataStore ->
-  so ->
+  rt ->
   FilePath ->
   IO (FetchId l)
 addWiresharkFetch objStore dataStore ty fetch =
