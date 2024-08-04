@@ -8,14 +8,19 @@ use webar_core::Timestamp;
 use webar_data::{bytes::ByteBuf, ser::Never};
 use webar_stackexchange_core::{
     api::{
-        Answer, Badge, Collective, Comment, Info, Object, Question, Revision, Tag, TagSynonym,
-        TagWiki, User, Wrapper,
+        filter::{FilterSpec, TypeMap},
+        model::{
+            Answer, ApiObject, Badge, Collective, Comment, Info, Question, Revision, Tag,
+            TagSynonym, TagWiki, User, Wrapper,
+        },
+        request::{self, ApiObjectType, List, ListRequest, Objects, RequestId, ResponseId},
     },
     fetcher::api_client::{ApiData, ApiResponse, HttpRequest, ListData, ObjectsData},
-    filter::{FilterInfo, TypeMap},
     id::{AnswerId, BadgeId, CollectiveSlug, CommentId, QuestionId, RevisionId, TagName, UserId},
-    KnownSite, List, ListRequest, NonEmpty, ObjectType, Objects, RequestId, ResponseId,
+    KnownSite,
 };
+
+use crate::NonEmpty;
 
 struct ManyId<'a, T, I>(&'a NonEmpty<T, I>);
 impl<'a, T: Display, I: AsRef<[T]>> Display for ManyId<'a, T, I> {
@@ -28,8 +33,8 @@ impl<'a, T: Display, I: AsRef<[T]>> Display for ManyId<'a, T, I> {
     }
 }
 
-const CURRENT_VERSION: webar_stackexchange_core::ApiVersion =
-    webar_stackexchange_core::ApiVersion::V2_3;
+const CURRENT_VERSION: webar_stackexchange_core::api::ApiVersion =
+    webar_stackexchange_core::api::ApiVersion::V2_3;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -43,7 +48,7 @@ pub struct Client<FN> {
     pub seq: u32,
     pub site: KnownSite,
     pub runtime: tokio::runtime::Handle,
-    pub filter: TypeMap<FilterInfo<FN>>,
+    pub filter: TypeMap<FilterSpec<FN>>,
     pub client: reqwest::Client,
 }
 pub struct Response<O> {
@@ -70,7 +75,7 @@ impl Order {
 }
 
 pub trait ObjectApi {
-    const TYPE: ObjectType;
+    const TYPE: ApiObjectType;
     type Output: DeserializeOwned;
 
     fn into_url(self) -> Url;
@@ -84,7 +89,7 @@ pub struct ListReq<E: ?Sized, S> {
 }
 
 pub trait ListApi {
-    type Output: Object;
+    type Output: ApiObject;
     type Str;
     fn into_req(self) -> ListReq<Self, Self::Str>;
 }
@@ -156,7 +161,7 @@ impl<FN> Client<FN> {
                 method: reqwest::Method::GET.into(),
                 url,
                 request_id: RequestId::XRequestId(request_id),
-                response: webar_stackexchange_core::Response {
+                response: request::Response {
                     id: response_id,
                     status,
                     timestamp,
@@ -234,7 +239,7 @@ impl<FN: AsRef<str>> Client<FN> {
 
 pub struct GetInfo;
 impl ObjectApi for GetInfo {
-    const TYPE: ObjectType = ObjectType::Info;
+    const TYPE: ApiObjectType = ApiObjectType::Info;
     type Output = [Info<serde_json::Value>; 1];
     fn into_url(self) -> Url {
         Url::parse("https://api.stackexchange.com/2.3/info").unwrap()
@@ -253,8 +258,8 @@ impl<O> GetObjects<O> {
         }
     }
 }
-impl<O: Object> ObjectApi for GetObjects<O> {
-    const TYPE: ObjectType = O::TYPE;
+impl<O: ApiObject> ObjectApi for GetObjects<O> {
+    const TYPE: ApiObjectType = O::TYPE;
     type Output = Vec<O>;
     fn into_url(self) -> Url {
         self.url
@@ -360,7 +365,7 @@ impl<LS, S: Default, O> PagedObjects<S, O, LS> {
         self
     }
 }
-impl<LS, S: Sort, O: Object> ListApi for PagedObjects<S, O, LS> {
+impl<LS, S: Sort, O: ApiObject> ListApi for PagedObjects<S, O, LS> {
     type Output = O;
     type Str = LS;
     fn into_req(mut self) -> ListReq<Self, Self::Str> {
@@ -434,7 +439,7 @@ impl AnswerHandler {
         PagedComments::new(
             ListRequest::Answer {
                 id: self.0.clone(),
-                request: webar_stackexchange_core::AnswerListReq::Comment,
+                request: request::AnswerListReq::Comment,
             },
             &format_url!("/answers/{ids}/comments", self.0),
         )
@@ -443,7 +448,7 @@ impl AnswerHandler {
         ListRevision::new(
             ListRequest::Answer {
                 id: self.0,
-                request: webar_stackexchange_core::AnswerListReq::Revision,
+                request: request::AnswerListReq::Revision,
             },
             &format_url!("/posts/{ids}/revisions", self.0),
         )
@@ -470,7 +475,7 @@ impl<S: AsRef<str> + Clone> CollectiveHandler<S> {
         PagedAnswers::new(
             ListRequest::Collective {
                 id: self.0.clone(),
-                request: webar_stackexchange_core::CollectiveListReq::Answer,
+                request: request::CollectiveListReq::Answer,
             },
             &format_url!("/collectives/{ids}/answers", self.0),
         )
@@ -479,7 +484,7 @@ impl<S: AsRef<str> + Clone> CollectiveHandler<S> {
         PagedQuestions::new(
             ListRequest::Collective {
                 id: self.0.clone(),
-                request: webar_stackexchange_core::CollectiveListReq::Question,
+                request: request::CollectiveListReq::Question,
             },
             &format_url!("/collectives/{ids}/questions", self.0),
         )
@@ -488,7 +493,7 @@ impl<S: AsRef<str> + Clone> CollectiveHandler<S> {
         PagedTags::new(
             ListRequest::Collective {
                 id: self.0.clone(),
-                request: webar_stackexchange_core::CollectiveListReq::Tag,
+                request: request::CollectiveListReq::Tag,
             },
             &format_url!("/collectives/{ids}/tags", self.0),
         )
@@ -497,7 +502,7 @@ impl<S: AsRef<str> + Clone> CollectiveHandler<S> {
         PagedObjects::new(
             ListRequest::Collective {
                 id: self.0.clone(),
-                request: webar_stackexchange_core::CollectiveListReq::User,
+                request: request::CollectiveListReq::User,
             },
             &format_url!("/collectives/{ids}/users", self.0),
         )
@@ -523,7 +528,7 @@ impl QuestionHandler {
         PagedComments::new(
             ListRequest::Question {
                 id: self.0,
-                request: webar_stackexchange_core::QuestionListReq::Comment,
+                request: request::QuestionListReq::Comment,
             },
             &format_url!("/questions/{ids}/comments", self.0),
         )
@@ -532,7 +537,7 @@ impl QuestionHandler {
         PagedAnswers::new(
             ListRequest::Question {
                 id: self.0,
-                request: webar_stackexchange_core::QuestionListReq::Answer,
+                request: request::QuestionListReq::Answer,
             },
             &format_url!("/questions/{ids}/answers", self.0),
         )
@@ -541,7 +546,7 @@ impl QuestionHandler {
         ListRevision::new(
             ListRequest::Question {
                 id: self.0,
-                request: webar_stackexchange_core::QuestionListReq::Revision,
+                request: request::QuestionListReq::Revision,
             },
             &format_url!("/posts/{ids}/revisions", self.0),
         )
@@ -573,7 +578,7 @@ impl<S: AsRef<str> + Clone> TagHandler<S> {
         PagedTagSynonyms::new(
             ListRequest::Tag {
                 id: self.0.clone(),
-                request: webar_stackexchange_core::TagListReq::TagSynonym,
+                request: request::TagListReq::TagSynonym,
             },
             &format_url!("/tags/{ids}/synonyms", self.0),
         )
@@ -592,7 +597,7 @@ impl UserHandler {
         PagedAnswers::new(
             ListRequest::User {
                 id: self.0,
-                request: webar_stackexchange_core::UserListReq::Answer,
+                request: request::UserListReq::Answer,
             },
             &format_url!("/users/{ids}/answers", self.0),
         )
@@ -601,7 +606,7 @@ impl UserHandler {
         PagedObjects::new(
             ListRequest::User {
                 id: self.0,
-                request: webar_stackexchange_core::UserListReq::Badge,
+                request: request::UserListReq::Badge,
             },
             &format_url!("/users/{ids}/badges", self.0),
         )
@@ -610,7 +615,7 @@ impl UserHandler {
         PagedQuestions::new(
             ListRequest::User {
                 id: self.0,
-                request: webar_stackexchange_core::UserListReq::Question,
+                request: request::UserListReq::Question,
             },
             &format_url!("/users/{ids}/questions", self.0),
         )
@@ -619,7 +624,7 @@ impl UserHandler {
         PagedComments::new(
             ListRequest::User {
                 id: self.0,
-                request: webar_stackexchange_core::UserListReq::Comment,
+                request: request::UserListReq::Comment,
             },
             &format_url!("/users/{ids}/comments", self.0),
         )

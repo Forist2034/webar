@@ -20,7 +20,7 @@ use webar_core::{
 use webar_data::ser::Never;
 use webar_stackexchange_core::{
     id::{QuestionId, TagName},
-    KnownSite, NonEmpty,
+    KnownSite,
 };
 use webar_stackexchange_fetcher::{
     client::{
@@ -28,7 +28,7 @@ use webar_stackexchange_fetcher::{
         TagHandler, TagsHandler, UserHandler, UsersHandler,
     },
     sink::TarSink,
-    Client, Fetcher, ManyChunk, HS_FILTER_INFO,
+    Client, Fetcher, ManyChunk, NonEmpty, HS_FILTER_INFO,
 };
 
 // formatting sandbox

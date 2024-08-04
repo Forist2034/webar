@@ -12,7 +12,6 @@ module Webar.Server.StackExchange.Types
     UserId (..),
     RevisionId (..),
     AccountId (..),
-    FilterId (..),
     ApiSiteParameter (apiSiteParamToText),
     LinkUrl (..),
     HtmlContent (..),
@@ -28,7 +27,6 @@ import Data.UUID.Types (UUID)
 import Data.Word (Word64)
 import Webar.Data.Cbor
 import Webar.Data.Json
-import Webar.Digest (Digest)
 
 newtype AnswerId = AnswerId Word64
   deriving
@@ -159,9 +157,6 @@ newtype AccountId = AccountId Int64
       FromCbor,
       ToCbor
     )
-
-newtype FilterId = FilterId Digest
-  deriving (Show, Eq, Ord, FromJSON, ToJSON, FromCbor, ToCbor)
 
 newtype ApiSiteParameter = ApiSiteParameter {apiSiteParamToText :: Text}
   deriving

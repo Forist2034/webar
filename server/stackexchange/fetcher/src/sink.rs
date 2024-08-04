@@ -6,8 +6,8 @@ use webar_data::{
 };
 
 use webar_stackexchange_core::{
+    api::request::ResponseData,
     fetcher::api_client::{ApiResponse, ListData, ObjectsData},
-    ResponseData,
 };
 
 pub use io::Error;

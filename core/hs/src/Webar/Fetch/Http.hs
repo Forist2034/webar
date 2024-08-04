@@ -1,27 +1,21 @@
-{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Webar.Fetch.Http
-  ( FetchId (..),
-    Traffic (..),
+  ( Traffic (..),
     FetchInfo (..),
+    FetchId,
   )
 where
 
-import Webar.Data.Cbor (FromCbor, ToCbor)
-import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
-import Webar.Digest
+import Webar.Object
 import Webar.Types (Timestamp)
 
-newtype FetchId = FetchId Digest
-  deriving (Show, Eq, Ord, FromCbor, ToCbor, FromJSON, ToJSON)
-
 data Traffic = TWireshark
-  { twKeyLog :: Digest,
-    twRequestMeta :: Digest,
-    twData :: Digest
+  { twKeyLog :: DataId,
+    twRequestMeta :: DataId,
+    twData :: DataId
   }
   deriving (Show)
 
@@ -34,9 +28,9 @@ deriveSumData
 
 data FetchInfo l = FetchInfo
   { tiTimestamp :: Timestamp,
-    tiLog :: Digest,
+    tiLog :: DataId,
     tiUser :: Maybe l,
-    tiKeyLog :: Maybe Digest,
+    tiKeyLog :: Maybe DataId,
     tiTraffic :: Traffic
   }
   deriving (Show)
@@ -44,3 +38,5 @@ data FetchInfo l = FetchInfo
 deriveProdData
   ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''FetchInfo
+
+type FetchId l = ObjectId (FetchInfo l)

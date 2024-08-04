@@ -1,25 +1,50 @@
 {-# LANGUAGE LambdaCase #-}
 
 module Webar.Store.FileSystem
-  ( createFile,
-    P.createLink,
-    createObjectDir,
+  ( dropFileName,
+    buildPath,
+    createDirectoryAt,
+    createDirectoryIfMissingAt,
+    createFileAt,
+    linkAt,
+    linkFileAt,
+    setFdModeAt,
+    createReadOnlyDirAt,
   )
 where
 
-import Control.Exception
+import Control.Exception (bracket)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import qualified System.Directory.OsPath as D
+import qualified Data.ByteString.Builder as BSB
+import Foreign.C
 import System.IO.Error
-import System.OsPath.Posix
-import System.OsString.Internal.Types (OsString (OsString))
-import qualified System.Posix.PosixString as P
+import qualified System.Posix.ByteString as P
+import System.Posix.ByteString.FilePath
+import System.Posix.Types
 
-createFile :: PosixPath -> ByteString -> IO ()
-createFile p content =
+foreign import ccall unsafe "mkdirat"
+  c_mkdirat :: CInt -> CString -> CMode -> IO CInt
+
+foreign import ccall unsafe "linkat"
+  c_linkat :: CInt -> CString -> CInt -> CString -> CInt -> IO CInt
+
+foreign import ccall unsafe "fchmodat"
+  c_fchmodat :: CInt -> CString -> CMode -> CInt -> IO CInt
+
+dropFileName :: ByteString -> ByteString
+dropFileName p = case BS.unsnoc p of
+  Just (p1, 47) -> BS.dropWhileEnd (/= 47) p1
+  _ -> BS.dropWhileEnd (/= 47) p
+
+buildPath :: BSB.Builder -> RawFilePath
+buildPath = BS.toStrict . BSB.toLazyByteString
+
+createFileAt :: Fd -> RawFilePath -> ByteString -> IO ()
+createFileAt atFd p content =
   bracket
-    ( P.openFd
+    ( P.openFdAt
+        (Just atFd)
         p
         P.WriteOnly
         P.defaultFileFlags {P.exclusive = True, P.creat = Just 0o444}
@@ -33,11 +58,62 @@ createFile p content =
           P.fdWrite fd bs >>= \l ->
             write (BS.drop (fromIntegral l) bs) fd
 
-createObjectDir :: PosixPath -> IO () -> IO ()
-createObjectDir path act = do
-  D.createDirectoryIfMissing True (OsString (dropFileName path))
-  tryIOError (P.createDirectory path 0o755) >>= \case
-    Right _ -> act >> P.setFileMode path 0o555
+createDirectoryAt :: Fd -> RawFilePath -> CMode -> IO ()
+createDirectoryAt (Fd fd) name m =
+  withFilePath name (\s -> throwErrnoIfMinus1_ "createDirectoryAt" (c_mkdirat fd s m))
+
+createDirectoryIfMissingAt :: Fd -> RawFilePath -> CMode -> IO Bool
+createDirectoryIfMissingAt fd name m =
+  tryIOError (createDirectoryAt fd name m) >>= \case
+    Right _ -> pure True
     Left e
-      | isAlreadyExistsError e -> pure ()
+      | isAlreadyExistsError e -> pure False
+      | isDoesNotExistError e -> do
+          go (dropFileName name)
+          createDirectoryAt fd name m
+          pure True
       | otherwise -> ioError e
+  where
+    go path =
+      tryIOError (createDirectoryAt fd path 0o777) >>= \case
+        Right _ -> pure ()
+        Left e
+          | isAlreadyExistsError e -> pure ()
+          | isDoesNotExistError e ->
+              go (dropFileName path) >> createDirectoryAt fd path 0o777
+          | otherwise -> ioError e
+
+linkAt :: Fd -> RawFilePath -> Fd -> RawFilePath -> IO ()
+linkAt (Fd oldFd) oldPath (Fd newFd) newPath =
+  withFilePath
+    oldPath
+    ( \os ->
+        withFilePath
+          newPath
+          ( \ns ->
+              throwErrnoIfMinus1_ "linkAt" (c_linkat oldFd os newFd ns 0)
+          )
+    )
+
+-- | linkAt that use same path
+linkFileAt :: Fd -> Fd -> RawFilePath -> IO ()
+linkFileAt (Fd oldFd) (Fd newFd) path =
+  withFilePath
+    path
+    ( \p ->
+        throwErrnoIfMinus1_ "linkFileAt" (c_linkat oldFd p newFd p 0)
+    )
+
+setFdModeAt :: Fd -> RawFilePath -> CMode -> IO ()
+setFdModeAt (Fd fd) path mode =
+  withFilePath
+    path
+    ( \p ->
+        throwErrnoIfMinus1_ "setFdModeAt" (c_fchmodat fd p mode 0)
+    )
+
+createReadOnlyDirAt :: Fd -> RawFilePath -> IO () -> IO ()
+createReadOnlyDirAt fd path act = do
+  createDirectoryIfMissingAt fd path 0o755 >>= \case
+    True -> act >> setFdModeAt fd path 0o555
+    False -> pure ()

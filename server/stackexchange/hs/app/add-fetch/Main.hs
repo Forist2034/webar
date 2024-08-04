@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
@@ -14,70 +14,47 @@ import Control.Monad (zipWithM_)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.TH as Aeson.TH
-import Data.Bits (Bits (unsafeShiftR, (.&.)))
-import qualified Data.ByteArray.Hash as MH
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as LBS
 import Data.Conduit ((.|))
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Tar as Tar
+import Data.Functor (void)
 import qualified Data.Map.Strict as M
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Set as S
-import Data.Text (Text)
-import qualified Data.Text.Encoding as TE
-import qualified Data.UUID.Types as UUID
 import qualified Data.Vector as V
-import Data.Void (Void)
-import Data.Word (Word32, Word64, Word8)
+import Data.Word (Word32)
 import System.Environment (getArgs)
+import System.FilePath
 import System.IO (hPutStrLn, stderr)
-import System.OsPath.Posix
-import qualified System.OsString.Posix as OSStr
 import qualified Webar.Data.BinJson as BinJson
 import qualified Webar.Data.Cbor as Cbor
 import qualified Webar.Data.Json as Json
-import Webar.Digest
-import Webar.Fetch.Http (FetchId)
 import Webar.Fetch.Http.Store (addWiresharkFetch)
 import Webar.Http
-import qualified Webar.Server.StackExchange.Api.Object as Api
+import Webar.Object
+import Webar.Server.StackExchange.Api.Filter (FilterId)
+import Webar.Server.StackExchange.Api.Request
+import qualified Webar.Server.StackExchange.Api.Model as Api
 import Webar.Server.StackExchange.Api.Source
+import Webar.Server.StackExchange.Api.Types
 import Webar.Server.StackExchange.Fetcher.ApiClient
-import Webar.Server.StackExchange.Types
-import Webar.Store.File.DedupStore (DedupStore)
-import qualified Webar.Store.File.DedupStore as Files
-import Webar.Store.FileSystem
-import Webar.Types
+import qualified Webar.Store.Data.Base as DS.B
+import Webar.Store.Data.WithShared (DataStore)
+import qualified Webar.Store.Data.WithShared as DS
+import qualified Webar.Store.Object.Base as OS.B
+import qualified Webar.Store.Object.Website as OS
+import Webar.Types (Timestamp)
 
-buildPath :: BSB.Builder -> PosixPath
-buildPath builder =
-  OSStr.fromBytestring
-    (BS.toStrict (BSB.toLazyByteString builder))
-
-createHttpObject :: PosixPath -> BSB.Builder -> Sha256 -> (PosixPath -> IO ()) -> IO ()
-createHttpObject root ty h act =
-  let path =
-        root
-          </> buildPath
-            ( "http/"
-                <> ty
-                <> ".sha256/"
-                <> ( let SubDir sub _ _ _ = sha256SubDir h
-                      in BSB.word8HexFixed sub
-                   )
-                <> "/"
-                <> BSB.stringUtf8 (sha256ToString h)
-            )
-   in createObjectDir path (act path)
+type ObjectStore = OS.ObjectStore () ArchiveInfo RecordType
 
 data Context = Context
-  { ctxFileStore :: !DedupStore,
-    ctxFetchId :: !FetchId,
-    ctxRoot :: !PosixPath
+  { ctxDataStore :: !DataStore,
+    ctxObjectStore :: !ObjectStore,
+    ctxFetchId :: !FetchId
   }
 
 addHttpResponse ::
@@ -87,75 +64,30 @@ addHttpResponse ::
   HttpRequest ->
   IO HttpResponseId
 addHttpResponse ctx callSeq respIdx req =
-  let bodySha256 = DSha256 (sha256Hash (respBody (hrResponse req)))
-      info =
-        Cbor.encodeStrictBs
-          HttpInfo
-            { hiUrl = hrUrl req,
-              hiFetch = ctxFetchId ctx,
-              hiRequestId = hrRequestId req,
-              hiCallSeq = callSeq,
-              hiResponseIndex = fromIntegral respIdx,
-              hiResponse = (hrResponse req) {respBody = bodySha256}
-            }
-      sha256 = sha256Hash info
-   in HttpResponseId (DSha256 sha256)
-        <$ createHttpObject
-          (ctxRoot ctx)
-          "request"
-          sha256
-          ( \path ->
-              do
-                createFile (path </> [pstr|info.bin|]) info
-                Files.addFile
-                  (ctxFileStore ctx)
-                  bodySha256
-                  (respBody (hrResponse req))
-                  (path </> [pstr|response|])
-          )
+  DS.addByteString ctx.ctxDataStore req.hrResponse.respBody >>= \body ->
+    OS.objectId
+      <$> OS.addObject
+        ctx.ctxObjectStore
+        (OtRecord RtHttpRequest)
+        1
+        HttpInfo
+          { hiUrl = hrUrl req,
+            hiFetch = ctxFetchId ctx,
+            hiRequestId = hrRequestId req,
+            hiCallSeq = callSeq,
+            hiResponseIndex = fromIntegral respIdx,
+            hiResponse = (hrResponse req) {respBody = body.dataId}
+          }
 
 addApiResponse :: Context -> ApiInfo -> IO ApiResponseId
 addApiResponse ctx resp =
-  let info = Cbor.encodeStrictBs resp
-      sha256 = sha256Hash info
-   in ApiResponseId (DSha256 sha256)
-        <$ createHttpObject
-          (ctxRoot ctx)
-          "api-response"
-          sha256
-          (\path -> createFile (path </> [pstr|info.bin|]) info)
+  OS.objectId
+    <$> OS.addObject ctx.ctxObjectStore (OtRecord RtApiResponse) 1 resp
 
-data DataKind = ApiItem | ItemList
-
-addObjectData ::
-  DedupStore ->
-  PosixPath ->
-  Digest ->
-  DataKind ->
-  ByteString ->
-  IO PosixPath
-addObjectData fileStore root digest@(DSha256 sha256) kind content =
-  let dir = root </> [pstr|data.sha256|] </> unsafeEncodeUtf (sha256ToString sha256)
-      path =
-        dir </> case kind of
-          ApiItem -> [pstr|api.bin|]
-          ItemList -> [pstr|list.bin|]
-   in path <$ createObjectDir dir (Files.addFile fileStore digest content path)
-
-addObjectMeta :: (Cbor.ToCbor a) => PosixPath -> PosixPath -> a -> PosixPath -> DataKind -> IO ()
-addObjectMeta root snapshotId meta dataPath kind =
-  let dir = root </> [pstr|snapshot|] </> snapshotId
-   in createObjectDir
-        dir
-        ( do
-            createFile (dir </> [pstr|info.bin|]) (Cbor.encodeStrictBs meta)
-            createLink
-              dataPath
-              ( dir </> case kind of
-                  ApiItem -> [pstr|api.bin|]
-                  ItemList -> [pstr|list.bin|]
-              )
-        )
+addSnapshot :: (Cbor.ToCbor a) => Context -> ArchiveInfo -> a -> IO ()
+addSnapshot ctx archive meta =
+  OS.addObject ctx.ctxObjectStore OtArchive 1 archive >>= \arch ->
+    void (OS.addObject ctx.ctxObjectStore (OtSnapshot arch.objectId) 1 meta)
 
 data ItemMeta = ItemMeta
   { imSite :: !ApiSiteParameter,
@@ -165,162 +97,89 @@ data ItemMeta = ItemMeta
     imTimestamp :: !Timestamp
   }
 
-addApiItem :: (Cbor.ToCbor a) => Context -> PosixPath -> ItemMeta -> Word32 -> a -> IO ()
-addApiItem ctx root meta idx bv =
-  let bin = Cbor.encodeStrictBs bv
-      sha256 = sha256Hash bin
-   in addObjectData (ctxFileStore ctx) root (DSha256 sha256) ApiItem bin >>= \dataPath ->
-        addObjectMeta
-          root
-          ( buildPath
-              ( "sha256-"
-                  <> BSB.stringUtf8
-                    ( sha256ToString
-                        ( case imApiResponseId meta of
-                            ApiResponseId (DSha256 s) -> s
-                        )
-                    )
-                  <> "_"
-                  <> BSB.word32Dec idx
-              )
-          )
-          Metadata
-            { metaFetch = ctxFetchId ctx,
-              metaId =
-                SnapshotId
-                  { siApiResponse = imApiResponseId meta,
-                    siIndex = Just idx
-                  },
-              metaContent = CNormal (DSha256 sha256),
-              metaApiVersion = imApiVersion meta,
-              metaFilter = imFilter meta,
-              metaTimestamp = imTimestamp meta
-            }
-          dataPath
-          ApiItem
+addApiItem :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> Word32 -> a -> IO ()
+addApiItem ctx meta archive idx bv =
+  DS.addByteString ctx.ctxDataStore (Cbor.encodeStrictBs bv) >>= \dat ->
+    addSnapshot
+      ctx
+      (AiSite meta.imSite archive)
+      Metadata
+        { metaFetch = ctx.ctxFetchId,
+          metaApiResponse = meta.imApiResponseId,
+          metaApiIndex = Just idx,
+          metaContent = CNormal dat.dataId,
+          metaApiVersion = meta.imApiVersion,
+          metaFilter = meta.imFilter,
+          metaTimestamp = meta.imTimestamp
+        }
 
-addItemList :: (Cbor.ToCbor a) => Context -> PosixPath -> ItemMeta -> Bool -> S.Set a -> IO ()
-addItemList ctx root meta full lst =
-  let bin = Cbor.encodeStrictBs lst
-      digest = DSha256 (sha256Hash bin)
-   in addObjectData (ctxFileStore ctx) root digest ItemList bin >>= \dataPath ->
-        addObjectMeta
-          root
-          ( unsafeEncodeUtf
-              ( "sha256-"
-                  ++ sha256ToString
-                    ( case imApiResponseId meta of
-                        ApiResponseId (DSha256 h) -> h
-                    )
-              )
-          )
-          ListMeta
-            { listFetch = ctxFetchId ctx,
-              listId = imApiResponseId meta,
-              listContent = LcNormal {lcContent = digest, lcFull = full},
-              listApiVersion = imApiVersion meta,
-              listTimestamp = imTimestamp meta
-            }
-          dataPath
-          ItemList
-
-data IdPath = IdPath !ByteString !Word8 !BSB.Builder
-
-idPathToPath :: ItemMeta -> IdPath -> ByteString -> PosixPath
-idPathToPath meta (IdPath ty sub p) child =
-  buildPath
-    ( "site/"
-        <> TE.encodeUtf8Builder (apiSiteParamToText (imSite meta))
-        <> "/"
-        <> BSB.byteString ty
-        <> "/"
-        <> BSB.word8HexFixed sub
-        <> "/"
-        <> p
-        <> "/"
-        <> BSB.byteString child
-    )
+addItemList :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> Bool -> S.Set a -> IO ()
+addItemList ctx meta archive full v =
+  DS.addByteString ctx.ctxDataStore (Cbor.encodeStrictBs v) >>= \dat ->
+    addSnapshot
+      ctx
+      (AiSite meta.imSite archive)
+      ListMeta
+        { listFetch = ctx.ctxFetchId,
+          listApiResponse = meta.imApiResponseId,
+          listContent = LcNormal {lcContent = dat.dataId, lcFull = full},
+          listApiVersion = meta.imApiVersion,
+          listTimestamp = meta.imTimestamp
+        }
 
 class (Json.FromJSON a, Cbor.ToCbor (Id a), Ord (Id a)) => Item a where
   type Id a
-  childDir :: Proxy a -> ByteString
-  childDir _ = "info"
-  idPath :: a -> IdPath
+  archiveInfo :: a -> ArchiveSiteData
   itemId :: a -> Id a
-
-word64Path :: ByteString -> Word64 -> IdPath
-word64Path ty w = IdPath ty (fromIntegral (w .&. 0xff)) (BSB.word64Dec w)
-
-textPath :: ByteString -> Text -> IdPath
-textPath ty t =
-  let bs = TE.encodeUtf8 t
-      MH.SipHash h = MH.sipHash (MH.SipKey 0 0) bs
-   in IdPath ty (fromIntegral (h .&. 0xff)) (BSB.byteString bs)
-
-revisionPath :: RevisionId -> IdPath
-revisionPath (RevisionId r) =
-  IdPath
-    "revision"
-    (fromIntegral (fst (UUID.toWords64 r) `unsafeShiftR` 56))
-    (BSB.byteString (UUID.toASCIIBytes r))
-
-userPath :: UserId -> IdPath
-userPath (UserId u) = IdPath "user" (fromIntegral (u .&. 0xff)) (BSB.int64Dec u)
 
 instance Item Api.Answer where
   type Id Api.Answer = AnswerId
-  idPath Api.Answer {Api.ansAnswerId = AnswerId aId} = word64Path "answer" aId
+  archiveInfo ans = AsdAnswer ans.ansAnswerId AAnsInfo
   itemId = Api.ansAnswerId
 
 instance Item Api.Badge where
   type Id Api.Badge = BadgeId
-  idPath Api.Badge {Api.bBadgeId = BadgeId bId} = word64Path "badge" bId
+  archiveInfo b = AsdBadge b.bBadgeId ABdgInfo
   itemId = Api.bBadgeId
 
 instance Item Api.Collective where
   type Id Api.Collective = CollectiveSlug
-  idPath Api.Collective {Api.colSlug = CollectiveSlug s} = textPath "collective" s
+  archiveInfo col = AsdCollective col.colSlug AColInfo
   itemId = Api.colSlug
 
 instance Item Api.Comment where
   type Id Api.Comment = CommentId
-  idPath Api.Comment {Api.comCommentId = CommentId cId} = word64Path "comment" cId
+  archiveInfo com = AsdComment com.comCommentId AComInfo
   itemId = Api.comCommentId
 
 instance Item Api.Question where
   type Id Api.Question = QuestionId
-  idPath Api.Question {Api.qQuestionId = QuestionId qId} = word64Path "question" qId
+  archiveInfo q = AsdQuestion q.qQuestionId AQueInfo
   itemId = Api.qQuestionId
 
 instance Item Api.Tag where
   type Id Api.Tag = TagName
-  idPath Api.Tag {Api.tagName = TagName t} = textPath "tag" t
+  archiveInfo t = AsdTag t.tagName ATagInfo
   itemId = Api.tagName
 
 instance Item Api.TagSynonym where
   type Id Api.TagSynonym = TagName
-  idPath Api.TagSynonym {Api.tagSynFromTag = TagName t} = textPath "tag_synonym" t
+  archiveInfo t = AsdTagSynonym t.tagSynFromTag ATSynInfo
   itemId = Api.tagSynFromTag
 
 instance Item Api.TagWiki where
   type Id Api.TagWiki = TagName
-  childDir _ = "wiki"
-  idPath Api.TagWiki {Api.twTagName = TagName t} = textPath "tag" t
+  archiveInfo t = AsdTagWiki t.twTagName ATWkInfo
   itemId = Api.twTagName
 
 instance Item Api.User where
   type Id Api.User = UserId
-  idPath u = userPath (Api.usrUserId u)
+  archiveInfo u = AsdUser u.usrUserId AUsrInfo
   itemId = Api.usrUserId
 
 addItem :: forall a. (Item a) => Context -> ItemMeta -> Word32 -> BinJson.WithBinValue a -> IO ()
 addItem ctx meta idx (BinJson.WithBinValue bv obj) =
-  addApiItem
-    ctx
-    (ctxRoot ctx </> idPathToPath meta (idPath obj) (childDir @a Proxy))
-    meta
-    idx
-    bv
+  addApiItem ctx meta (archiveInfo obj) idx bv
 
 addItemsResp :: forall a. (Item a) => Context -> ItemMeta -> Proxy a -> ByteString -> IO ()
 addItemsResp ctx meta _ body =
@@ -338,11 +197,10 @@ addItemListResp ::
   (Item a) =>
   Context ->
   ListArgs ->
-  IdPath ->
-  ByteString ->
+  ArchiveSiteData ->
   Proxy a ->
   IO ()
-addItemListResp ctx (ListArgs meta full resp) p child _ = do
+addItemListResp ctx (ListArgs meta full resp) archive _ = do
   ids <-
     V.foldM'
       ( \i r ->
@@ -358,15 +216,10 @@ addItemListResp ctx (ListArgs meta full resp) p child _ = do
       )
       S.empty
       resp
-  addItemList
-    ctx
-    (ctxRoot ctx </> idPathToPath meta p child)
-    meta
-    full
-    ids
+  addItemList ctx meta archive full ids
 
-addRevisionListResp :: Context -> ListArgs -> IdPath -> IO ()
-addRevisionListResp ctx (ListArgs meta full resp) p =
+addRevisionListResp :: Context -> ListArgs -> ArchiveSiteData -> IO ()
+addRevisionListResp ctx (ListArgs meta full resp) archive =
   let revs =
         V.foldr'
           ( \r mp -> case Aeson.eitherDecodeStrict' (respBody (hrResponse r)) of
@@ -388,22 +241,10 @@ addRevisionListResp ctx (ListArgs meta full resp) p =
           resp
    in do
         zipWithM_
-          ( \idx (k, v) ->
-              addApiItem
-                ctx
-                (ctxRoot ctx </> idPathToPath meta (revisionPath k) "info")
-                meta
-                idx
-                v
-          )
+          (\idx (k, v) -> addApiItem ctx meta (AsdRevision k ARevInfo) idx v)
           [0 ..]
           (M.toAscList revs)
-        addItemList
-          ctx
-          (ctxRoot ctx </> idPathToPath meta p "revision")
-          meta
-          full
-          (M.keysSet revs)
+        addItemList ctx meta archive full (M.keysSet revs)
 
 newtype Info = Info {infoSite :: BinJson.WithBinValue Api.Site}
 
@@ -458,18 +299,7 @@ addEntry ctx bs =
             OtInfo -> do
               Api.Wrapper {Api.wItems = IInfo (Info {infoSite = BinJson.WithBinValue bv _})} <-
                 Aeson.throwDecodeStrict body
-              addApiItem
-                ctx
-                ( ctxRoot ctx
-                    </> buildPath
-                      ( "site/"
-                          <> TE.encodeUtf8Builder (apiSiteParamToText (arSite entry))
-                          <> "/info"
-                      )
-                )
-                meta
-                0
-                bv
+              addApiItem ctx meta AsdInfo 0 bv
             OtQuestion -> addItemsResp @Api.Question ctx meta Proxy body
             OtRevision -> error "revision must be in api list"
             OtTag -> addItemsResp @Api.Tag ctx meta Proxy body
@@ -511,18 +341,16 @@ addEntry ctx bs =
                     lrResponses = resp
                   }
           case req of
-            LrAnswer {lraId = AnswerId aId, lraRequest = aReq} ->
-              let p = word64Path "answer" aId
-               in case aReq of
-                    AlComment -> addItemListResp @Api.Comment ctx args p "comment" Proxy
-                    AlRevision -> addRevisionListResp ctx args p
-            LrCollective {lrcId = CollectiveSlug cId, lrcRequest = cReq} ->
-              let p = textPath "collective" cId
-               in case cReq of
-                    ClAnswer -> addItemListResp @Api.Answer ctx args p "answer" Proxy
-                    ClQuestion -> addItemListResp @Api.Question ctx args p "question" Proxy
-                    ClTag -> addItemListResp @Api.Tag ctx args p "tag" Proxy
-                    ClUser -> addItemListResp @Api.User ctx args p "user" Proxy
+            LrAnswer {lraId = aId, lraRequest = aReq} ->
+              case aReq of
+                AlComment -> addItemListResp @Api.Comment ctx args (AsdAnswer aId AAnsComment) Proxy
+                AlRevision -> addRevisionListResp ctx args (AsdAnswer aId AAnsRevision)
+            LrCollective {lrcId = cId, lrcRequest = cReq} ->
+              case cReq of
+                ClAnswer -> addItemListResp @Api.Answer ctx args (AsdCollective cId AColAnswer) Proxy
+                ClQuestion -> addItemListResp @Api.Question ctx args (AsdCollective cId AColQuestion) Proxy
+                ClTag -> addItemListResp @Api.Tag ctx args (AsdCollective cId AColTag) Proxy
+                ClUser -> addItemListResp @Api.User ctx args (AsdCollective cId AColUser) Proxy
             LrListRevision revId
               | f ->
                   let content =
@@ -533,64 +361,87 @@ addEntry ctx bs =
                                 Left e -> throw (Aeson.AesonException e)
                           )
                           resp
-                   in addApiItem
-                        ctx
-                        (ctxRoot ctx </> idPathToPath meta (revisionPath revId) "info")
-                        meta
-                        0
-                        content
+                   in addApiItem ctx meta (AsdRevision revId ARevInfo) 0 content
               | otherwise -> error "incomplete revision"
-            LrQuestion {lrqId = QuestionId qId, lrqRequest = qReq} ->
-              let p = word64Path "question" qId
-               in case qReq of
-                    QlAnswer -> addItemListResp @Api.Answer ctx args p "answer" Proxy
-                    QlComment -> addItemListResp @Api.Comment ctx args p "comment" Proxy
-                    QlRevision -> addRevisionListResp ctx args p
-            LrTag {lrtId = TagName tId, lrtRequest = tReq} ->
-              let p = textPath "tag" tId
-               in case tReq of
-                    TlTagSynonym -> addItemListResp @Api.TagSynonym ctx args p "synonym" Proxy
+            LrQuestion {lrqId = qId, lrqRequest = qReq} ->
+              case qReq of
+                QlAnswer -> addItemListResp @Api.Answer ctx args (AsdQuestion qId AQueAnswer) Proxy
+                QlComment -> addItemListResp @Api.Comment ctx args (AsdQuestion qId AQueComment) Proxy
+                QlRevision -> addRevisionListResp ctx args (AsdQuestion qId AQueRevision)
+            LrTag {lrtId = tId, lrtRequest = tReq} ->
+              case tReq of
+                TlTagSynonym -> addItemListResp @Api.TagSynonym ctx args (AsdTag tId ATagSynonym) Proxy
             LrUser {lruId = u, lruRequest = uReq} ->
-              let p = userPath u
-               in case uReq of
-                    UlAnswer -> addItemListResp @Api.Answer ctx args p "answer" Proxy
-                    UlBadge -> addItemListResp @Api.Badge ctx args p "badge" Proxy
-                    UlComment -> addItemListResp @Api.Comment ctx args p "comment" Proxy
-                    UlQuestion -> addItemListResp @Api.Question ctx args p "question" Proxy
+              case uReq of
+                UlAnswer -> addItemListResp @Api.Answer ctx args (AsdUser u AUsrAnswer) Proxy
+                UlBadge -> addItemListResp @Api.Badge ctx args (AsdUser u AUsrBadge) Proxy
+                UlComment -> addItemListResp @Api.Comment ctx args (AsdUser u AUsrComment) Proxy
+                UlQuestion -> addItemListResp @Api.Question ctx args (AsdUser u AUsrQuestion) Proxy
+
+withDataStore :: FilePath -> FilePath -> (DataStore -> IO c) -> IO c
+withDataStore root serverRoot f =
+  bracket
+    (DS.B.openByFilePath (root </> "store/data"))
+    DS.B.close
+    ( \baseData ->
+        bracket
+          (DS.openByFilePath baseData (serverRoot </> "store/data"))
+          DS.close
+          f
+    )
+
+withObjectStore :: FilePath -> FilePath -> (ObjectStore -> IO c) -> IO c
+withObjectStore root serverRoot f =
+  bracket
+    (OS.B.openByFilePath (root </> "store/object"))
+    OS.B.close
+    ( \baseObj ->
+        bracket
+          (OS.openByFilePath server () baseObj (serverRoot </> "store/object"))
+          OS.close
+          f
+    )
 
 main :: IO ()
 main = do
-  (storeRoot, fileStore, fetchPath) <-
+  (storeRoot, serverRoot, fetchPath) <-
     getArgs >>= \case
       [sr, fs, fp] -> pure (sr, fs, fp)
       _ -> error "invalid args"
-  root <- encodeFS storeRoot
-  fetchP <- encodeFS fetchPath
-  fetchId <- addWiresharkFetch @Void root Proxy fetchP
-  dedupStore <- encodeFS fileStore >>= Files.openOrCreate
-  let context =
-        Context
-          { ctxFileStore = dedupStore,
-            ctxFetchId = fetchId,
-            ctxRoot = root
-          }
-  C.withSourceFile
-    (fetchPath ++ "/data.tar")
-    ( \i ->
-        C.runConduit
-          ( i
-              .| Tar.untar
-                ( \fi ->
-                    C.map BSB.byteString .| C.sinkLazyBuilder >>= \ent ->
-                      liftIO
-                        ( catch
-                            (addEntry context ent >> print (Tar.filePath fi))
-                            ( \(SomeException exn) ->
-                                hPutStrLn
-                                  stderr
-                                  (show (Tar.filePath fi) ++ ": " ++ displayException exn)
+  withDataStore
+    storeRoot
+    serverRoot
+    ( \ds ->
+        withObjectStore
+          storeRoot
+          serverRoot
+          ( \os -> do
+              fetchId <- addWiresharkFetch os ds RtFetch fetchPath
+              let context =
+                    Context
+                      { ctxDataStore = ds,
+                        ctxObjectStore = os,
+                        ctxFetchId = fetchId
+                      }
+              C.withSourceFile
+                (fetchPath ++ "/data.tar")
+                ( \i ->
+                    C.runConduit
+                      ( i
+                          .| Tar.untar
+                            ( \fi ->
+                                C.map BSB.byteString .| C.sinkLazyBuilder >>= \ent ->
+                                  liftIO
+                                    ( catch
+                                        (addEntry context ent >> print (Tar.filePath fi))
+                                        ( \(SomeException exn) ->
+                                            hPutStrLn
+                                              stderr
+                                              (show (Tar.filePath fi) ++ ": " ++ displayException exn)
+                                        )
+                                    )
                             )
-                        )
+                      )
                 )
           )
     )

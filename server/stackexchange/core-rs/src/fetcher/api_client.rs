@@ -1,4 +1,5 @@
 use serde::Deserialize;
+
 use webar_core::{
     http::{HeaderMap, HeaderValue, Method},
     Timestamp,
@@ -6,7 +7,12 @@ use webar_core::{
 use webar_data::{bytes::ByteBuf, ser::Serialize};
 
 use crate::{
-    filter::FilterId, ApiVersion, KnownSite, List, ListRequest, Objects, RequestId, Response,
+    api::{
+        filter::FilterId,
+        request::{List, ListRequest, Objects, RequestId, Response},
+        ApiVersion,
+    },
+    KnownSite,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -65,5 +71,5 @@ pub struct ApiResponse<R> {
 
 pub struct ApiData<R, I> {
     pub response: ApiResponse<R>,
-    pub parsed: crate::api::Wrapper<I>,
+    pub parsed: crate::api::model::Wrapper<I>,
 }

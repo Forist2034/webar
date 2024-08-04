@@ -1,11 +1,12 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Webar.Server.StackExchange.Api.ToFilter where
+module Webar.Server.StackExchange.Api.Filter.Internal where
 
 import Data.Foldable
 import Data.Functor
@@ -26,14 +27,9 @@ import Webar.Server.StackExchange.Types
 newtype Fields = Fields (Map Text (Vector Text))
   deriving (Show, ToJSON)
 
-newtype Param = Param (Map Text Text)
-  deriving (Show, ToJSON)
-
 class ToFilter a where
   addToFields :: Proxy a -> Fields -> Fields
   addToFields _ f = f
-  addToParam :: Proxy a -> Param -> Param
-  addToParam _ p = p
 
 instance ToFilter Word
 
@@ -77,11 +73,9 @@ instance ToFilter SafeText
 
 instance (ToFilter t) => ToFilter (Maybe t) where
   addToFields _ = addToFields @t Proxy
-  addToParam _ = addToParam @t Proxy
 
 instance (ToFilter t) => ToFilter (Vector t) where
   addToFields _ = addToFields @t Proxy
-  addToParam _ = addToParam @t Proxy
 
 deriveToFilter :: String -> Int -> Name -> DecsQ
 deriveToFilter tyName modifier n =
@@ -93,13 +87,13 @@ deriveToFilter tyName modifier n =
             TyConI (DataD _ _ [] _ [RecC _ fs] _) -> pure fs
             TyConI (NewtypeD _ _ [] _ (RecC _ fs) _) -> pure fs
             _ -> fail "unexpected type. expect record"
-        let parentF fun =
+        let parentF =
               newName "f" <&> \f ->
                 LamE
                   [VarP f]
                   ( foldl'
                       ( \e (_, _, t) ->
-                          VarE fun
+                          VarE 'addToFields
                             `AppE` SigE (ConE 'Proxy) (ConT ''Proxy `AppT` t)
                             `AppE` e
                       )
@@ -110,16 +104,12 @@ deriveToFilter tyName modifier n =
               map
                 (\(Name (OccName f) _, _, _) -> T.pack (camelTo2 '_' (drop modifier f)))
                 fields
-            fieldParam =
-              T.intercalate
-                ";"
-                (fmap (\f -> tName <> "." <> f) fieldNames)
         [d|
           instance ToFilter $(pure (ConT n)) where
             addToFields _ f@(Fields mp)
               | M.member $tNameQ mp = f
               | otherwise =
-                  $(parentF 'addToFields)
+                  $parentF
                     ( Fields
                         ( M.insert
                             $tNameQ
@@ -127,9 +117,4 @@ deriveToFilter tyName modifier n =
                             mp
                         )
                     )
-            addToParam _ f@(Param mp)
-              | M.member $tNameQ mp = f
-              | otherwise =
-                  $(parentF 'addToParam)
-                    (Param (M.insert $tNameQ $(lift fieldParam) mp))
           |]

@@ -5,15 +5,22 @@ use std::{
 
 use webar_data::ser::Serialize;
 use webar_stackexchange_core::{
-    api,
+    api::model,
     fetcher::api_client::{ApiData, ApiResponse, ListData, ObjectsData},
-    NonEmpty,
 };
 
 pub mod client;
 pub use client::Client;
 
 pub mod sink;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NonEmpty<T, I>(pub T, pub I);
+impl<T, I: AsRef<[T]>> NonEmpty<T, I> {
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        self.1.as_ref().into_iter().chain(std::iter::once(&self.0))
+    }
+}
 
 pub struct ManyChunk<const N: usize, I>(pub I);
 impl<const N: usize, I: FusedIterator> Iterator for ManyChunk<N, I> {
@@ -59,7 +66,7 @@ where
     FN: AsRef<str>,
     E: client::ListApi,
 {
-    type Item = Result<api::Wrapper<Vec<E::Output>>, client::Error>;
+    type Item = Result<model::Wrapper<Vec<E::Output>>, client::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         if *self.has_more {
             let _span = tracing::info_span!("fetch_page", page = self.page).entered();

@@ -9,11 +9,10 @@ import Data.Proxy
 import Data.Text (Text)
 import qualified Data.Vector as V
 import System.Environment (getArgs)
-import Webar.Data.Json
+import Webar.Data.Json (encodeStrictBs)
 import Webar.Data.Json.TH
-import Webar.Server.StackExchange.Api.Object
-import Webar.Server.StackExchange.Api.ToFilter
-import Webar.Server.StackExchange.Filter
+import Webar.Server.StackExchange.Api.Filter
+import Webar.Server.StackExchange.Api.Model
 
 defWrapper :: V.Vector Text
 defWrapper =
@@ -43,7 +42,7 @@ mkFilter p =
     { ffSafe = False,
       ffBase = Just "none",
       ffWrapper = defWrapper,
-      ffItem = addToFields p (Fields mempty)
+      ffItem = filterFields p
     }
 
 main :: IO ()

@@ -2,28 +2,25 @@ use std::fmt::Display;
 
 use serde::Deserialize;
 
-use webar_data::ser::Serialize;
+use webar_core::object::ObjectId;
+use webar_data::ser::{Never, Serialize};
 
-use crate::ObjectType;
+use crate::api::request::ApiObjectType;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Deserialize)]
-#[serde(transparent)]
-pub struct FilterId(pub webar_core::digest::Digest);
-impl Serialize for FilterId {
-    fn serialize<S: webar_data::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.0.serialize(serializer)
-    }
-}
+// stub definition
+pub struct FilterInfo(Never);
+
+pub type FilterId = ObjectId<FilterInfo>;
 
 #[derive(Debug, Serialize)]
-pub struct FilterInfo<I> {
+pub struct FilterSpec<I> {
     pub name: I,
     pub id: FilterId,
 }
 
 #[derive(Debug)]
 pub struct TypeMapError<E> {
-    pub field: ObjectType,
+    pub field: ApiObjectType,
     pub error: E,
 }
 impl<E> Display for TypeMapError<E> {
@@ -77,37 +74,37 @@ macro_rules! each_field {
 }
 macro_rules! field_ty {
     (answer) => {
-        ObjectType::Answer
+        ApiObjectType::Answer
     };
     (badge) => {
-        ObjectType::Badge
+        ApiObjectType::Badge
     };
     (comment) => {
-        ObjectType::Comment
+        ApiObjectType::Comment
     };
     (collective) => {
-        ObjectType::Collective
+        ApiObjectType::Collective
     };
     (info) => {
-        ObjectType::Info
+        ApiObjectType::Info
     };
     (question) => {
-        ObjectType::Question
+        ApiObjectType::Question
     };
     (revision) => {
-        ObjectType::Revision
+        ApiObjectType::Revision
     };
     (tag) => {
-        ObjectType::Tag
+        ApiObjectType::Tag
     };
     (tag_synonym) => {
-        ObjectType::TagSynonym
+        ApiObjectType::TagSynonym
     };
     (tag_wiki) => {
-        ObjectType::TagWiki
+        ApiObjectType::TagWiki
     };
     (user) => {
-        ObjectType::User
+        ApiObjectType::User
     }; // (site) => {
        // ObjectType::Site
        // };
@@ -151,7 +148,7 @@ impl<N> TypeMap<N> {
     }
     pub fn try_for_each_field<'a, E>(
         &'a self,
-        f: impl Fn(ObjectType, &'a N) -> Result<(), E>,
+        f: impl Fn(ApiObjectType, &'a N) -> Result<(), E>,
     ) -> Result<(), TypeMapError<E>> {
         macro_rules! field {
             ($field:ident) => {
@@ -165,42 +162,42 @@ impl<N> TypeMap<N> {
         Ok(())
     }
 }
-impl<N> std::ops::Index<ObjectType> for TypeMap<N> {
+impl<N> std::ops::Index<ApiObjectType> for TypeMap<N> {
     type Output = N;
     #[inline]
-    fn index(&self, index: ObjectType) -> &Self::Output {
+    fn index(&self, index: ApiObjectType) -> &Self::Output {
         match index {
-            ObjectType::Answer => &self.answer,
-            ObjectType::Badge => &self.badge,
-            ObjectType::Collective => &self.collective,
-            ObjectType::Comment => &self.comment,
-            ObjectType::Info => &self.info,
-            ObjectType::Question => &self.question,
-            ObjectType::Revision => &self.revision,
+            ApiObjectType::Answer => &self.answer,
+            ApiObjectType::Badge => &self.badge,
+            ApiObjectType::Collective => &self.collective,
+            ApiObjectType::Comment => &self.comment,
+            ApiObjectType::Info => &self.info,
+            ApiObjectType::Question => &self.question,
+            ApiObjectType::Revision => &self.revision,
             // ObjectType::Site => &self.site,
-            ObjectType::Tag => &self.tag,
-            ObjectType::TagSynonym => &self.tag_synonym,
-            ObjectType::TagWiki => &self.tag_wiki,
-            ObjectType::User => &self.user,
+            ApiObjectType::Tag => &self.tag,
+            ApiObjectType::TagSynonym => &self.tag_synonym,
+            ApiObjectType::TagWiki => &self.tag_wiki,
+            ApiObjectType::User => &self.user,
         }
     }
 }
-impl<N> std::ops::IndexMut<ObjectType> for TypeMap<N> {
+impl<N> std::ops::IndexMut<ApiObjectType> for TypeMap<N> {
     #[inline]
-    fn index_mut(&mut self, index: ObjectType) -> &mut Self::Output {
+    fn index_mut(&mut self, index: ApiObjectType) -> &mut Self::Output {
         match index {
-            ObjectType::Answer => &mut self.answer,
-            ObjectType::Badge => &mut self.badge,
-            ObjectType::Collective => &mut self.collective,
-            ObjectType::Comment => &mut self.comment,
-            ObjectType::Info => &mut self.info,
-            ObjectType::Question => &mut self.question,
-            ObjectType::Revision => &mut self.revision,
+            ApiObjectType::Answer => &mut self.answer,
+            ApiObjectType::Badge => &mut self.badge,
+            ApiObjectType::Collective => &mut self.collective,
+            ApiObjectType::Comment => &mut self.comment,
+            ApiObjectType::Info => &mut self.info,
+            ApiObjectType::Question => &mut self.question,
+            ApiObjectType::Revision => &mut self.revision,
             // ObjectType::Site => &mut self.site,
-            ObjectType::Tag => &mut self.tag,
-            ObjectType::TagSynonym => &mut self.tag_synonym,
-            ObjectType::TagWiki => &mut self.tag_wiki,
-            ObjectType::User => &mut self.user,
+            ApiObjectType::Tag => &mut self.tag,
+            ApiObjectType::TagSynonym => &mut self.tag_synonym,
+            ApiObjectType::TagWiki => &mut self.tag_wiki,
+            ApiObjectType::User => &mut self.user,
         }
     }
 }

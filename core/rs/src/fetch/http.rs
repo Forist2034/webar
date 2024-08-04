@@ -2,32 +2,7 @@ use serde::Deserialize;
 
 use webar_data::ser::Serialize;
 
-use crate::{digest::Digest, FilePath, Timestamp};
-
-/// digest of info.json
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct FetchId(pub Digest);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Traffic {
-    #[serde(rename = "wireshark")]
-    Wireshark {
-        key_log: Digest,
-        /// metadata of request, used to extract data from captured packet
-        request_meta: Digest,
-        data: Digest,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FetchInfo<L> {
-    pub timestamp: Timestamp,
-    pub log: Digest,
-    pub user: Option<L>,
-    pub key_log: Option<Digest>,
-    pub traffic: Traffic,
-}
+use crate::{FilePath, Timestamp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FetchMeta<L> {

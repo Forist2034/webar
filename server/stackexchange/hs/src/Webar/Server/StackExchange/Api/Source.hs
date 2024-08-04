@@ -4,104 +4,56 @@
 
 module Webar.Server.StackExchange.Api.Source where
 
-import Data.Text (Text)
-import Data.UUID.Types (UUID)
-import Data.Vector (Vector)
 import Data.Word (Word32)
-import Webar.Data.Cbor (FromCbor, ToCbor)
-import Webar.Data.Cbor.TH (deriveProdCbor)
-import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
-import Webar.Digest
-import Webar.Fetch.Http (FetchId)
-import qualified Webar.Http as H
-import Webar.Server.StackExchange.Types (AnswerId, ApiSiteParameter, CollectiveSlug, FilterId, QuestionId, RevisionId, TagName, UserId)
-import Webar.Types
+import Webar.Object
+import Webar.Server.StackExchange.Api.Filter (FilterId)
+import Webar.Server.StackExchange.Api.Request
+  ( ApiResponseId,
+    FetchId,
+  )
+import Webar.Server.StackExchange.Api.Types
+import Webar.Types (Timestamp)
 
-data ApiVersion
-  = Api2_3
-  deriving (Show, Eq, Ord)
+server :: Server
+server = Server {serverName = "StackExchange-api", serverVersion = 1}
 
-deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = fmap (\c -> if c == '_' then '.' else c) . drop 3
-    }
-  ''ApiVersion
-
-newtype RequestId = ReqXRequestId UUID
+data ArchiveAnswer
+  = AAnsInfo
+  | AAnsComment
+  | AAnsRevision
   deriving (Show, Eq)
 
-deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '-' . drop 3
-    }
-  ''RequestId
-
-newtype ResponseId = RespXRequestGuid UUID
+data ArchiveBadge = ABdgInfo
   deriving (Show, Eq)
 
-deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '-' . drop 4
-    }
-  ''ResponseId
-
-type Response = H.Response (Maybe ResponseId)
-
-data HttpInfo = HttpInfo
-  { hiUrl :: Text,
-    hiFetch :: FetchId,
-    hiCallSeq :: Word32,
-    hiResponseIndex :: Word32,
-    hiRequestId :: RequestId,
-    hiResponse :: Response Digest
-  }
-  deriving (Show)
-
-deriveProdCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
-  ''HttpInfo
-
-newtype HttpResponseId = HttpResponseId Digest
-  deriving (Show, Eq, Ord, FromJSON, ToJSON, FromCbor, ToCbor)
-
-data ObjectType
-  = OtAnswer
-  | OtBadge
-  | OtCollective
-  | OtComment
-  | OtInfo
-  | OtQuestion
-  | OtRevision
-  | OtTag
-  | OtTagSynonym
-  | OtTagWiki
-  | OtUser
+data ArchiveComment = AComInfo
   deriving (Show, Eq)
 
-deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
-    }
-  ''ObjectType
-
-data AnswerListReq = AlComment | AlRevision
+data ArchiveCollective
+  = AColInfo
+  | AColAnswer
+  | AColQuestion
+  | AColTag
+  | AColUser
   deriving (Show, Eq)
 
-data CollectiveListReq = ClAnswer | ClQuestion | ClTag | ClUser
+data ArchiveRevision = ARevInfo
   deriving (Show, Eq)
 
-data QuestionListReq = QlAnswer | QlComment | QlRevision
+data ArchiveQuestion = AQueInfo | AQueAnswer | AQueComment | AQueRevision
   deriving (Show, Eq)
 
-data TagListReq = TlTagSynonym
+data ArchiveTag = ATagInfo | ATagSynonym
   deriving (Show, Eq)
 
-data UserListReq = UlAnswer | UlBadge | UlComment | UlQuestion
+data ArchiveTagWiki = ATWkInfo
+  deriving (Show, Eq)
+
+data ArchiveTagSynonym = ATSynInfo
+  deriving (Show, Eq)
+
+data ArchiveUser = AUsrInfo | AUsrAnswer | AUsrBadge | AUsrComment | AUsrQuestion
   deriving (Show, Eq)
 
 $( concat
@@ -109,98 +61,72 @@ $( concat
        ( deriveSumData
            SumOptions
              { sumProduct = ProductOptions {fieldLabelModifier = id},
-               constructorTagModifier = camelTo2 '_' . drop 2
+               constructorTagModifier = camelTo2 '_' . drop 4
              }
        )
-       [ ''AnswerListReq,
-         ''CollectiveListReq,
-         ''QuestionListReq,
-         ''TagListReq,
-         ''UserListReq
+       [ ''ArchiveAnswer,
+         ''ArchiveBadge,
+         ''ArchiveComment,
+         ''ArchiveCollective,
+         ''ArchiveRevision,
+         ''ArchiveQuestion,
+         ''ArchiveTag,
+         ''ArchiveTagWiki,
+         ''ArchiveTagSynonym,
+         ''ArchiveUser
        ]
  )
 
-data ListRequest
-  = LrAnswer
-      { lraId :: AnswerId,
-        lraRequest :: AnswerListReq
-      }
-  | LrCollective
-      { lrcId :: CollectiveSlug,
-        lrcRequest :: CollectiveListReq
-      }
-  | LrListRevision RevisionId
-  | LrQuestion
-      { lrqId :: QuestionId,
-        lrqRequest :: QuestionListReq
-      }
-  | LrTag
-      { lrtId :: TagName,
-        lrtRequest :: TagListReq
-      }
-  | LrUser
-      { lruId :: UserId,
-        lruRequest :: UserListReq
-      }
-  deriving (Show)
+data ArchiveSiteData
+  = AsdAnswer AnswerId ArchiveAnswer
+  | AsdBadge BadgeId {-# UNPACK #-} ArchiveBadge
+  | AsdComment CommentId {-# UNPACK #-} ArchiveComment
+  | AsdCollective CollectiveSlug ArchiveCollective
+  | AsdInfo
+  | AsdRevision RevisionId {-# UNPACK #-} ArchiveRevision
+  | AsdQuestion QuestionId ArchiveQuestion
+  | AsdTag TagName ArchiveTag
+  | AsdTagWiki TagName {-# UNPACK #-} ArchiveTagWiki
+  | AsdTagSynonym TagName {-# UNPACK #-} ArchiveTagSynonym
+  | AsdUser UserId ArchiveUser
+  deriving (Show, Eq)
 
 deriveSumData
   SumOptions
-    { sumProduct =
-        ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
-      constructorTagModifier = camelTo2 '_' . drop 2
+    { sumProduct = ProductOptions {fieldLabelModifier = id},
+      constructorTagModifier = camelTo2 '_' . drop 3
     }
-  ''ListRequest
+  ''ArchiveSiteData
 
-data ResponseData r
-  = RdObjects
-      { rdoType :: ObjectType,
-        rdoResponse :: r
-      }
-  | RdList
-      { rdlRequest :: ListRequest,
-        rdlFull :: Bool,
-        rdlResponses :: Vector r
-      }
-  deriving (Show)
+data ArchiveInfo
+  = AiSite ApiSiteParameter ArchiveSiteData
+  deriving (Show, Eq)
 
 deriveSumData
   SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
+    { sumProduct = ProductOptions {fieldLabelModifier = id},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
-  ''ResponseData
+  ''ArchiveInfo
 
-data ApiInfo = ApiInfo
-  { apiFetch :: FetchId,
-    apiCallSeq :: Word32,
-    apiVersion :: ApiVersion,
-    apiSite :: ApiSiteParameter,
-    apiTimestamp :: Timestamp,
-    apiFilter :: FilterId,
-    apiResponse :: ResponseData HttpResponseId
-  }
-  deriving (Show)
+type ArchiveId = ObjectId ArchiveInfo
 
-deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
-  ''ApiInfo
+data RecordType
+  = RtFetch
+  | RtHttpRequest
+  | RtApiResponse
+  | RtFilter
+  deriving (Show, Eq)
 
-newtype ApiResponseId = ApiResponseId Digest
-  deriving (Show, Eq, Ord, FromJSON, ToJSON, FromCbor, ToCbor)
-
-data SnapshotId = SnapshotId
-  { siApiResponse :: ApiResponseId,
-    siIndex :: Maybe Word32
-  }
-  deriving (Show, Eq, Ord)
-
-deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
-  ''SnapshotId
+deriveSumData
+  SumOptions
+    { sumProduct = ProductOptions {fieldLabelModifier = id},
+      constructorTagModifier = camelTo2 '_' . drop 2
+    }
+  ''RecordType
 
 newtype Content
-  = CNormal Digest
+  = CNormal DataId
   deriving (Show)
 
 deriveSumData
@@ -212,7 +138,8 @@ deriveSumData
 
 data Metadata = Metadata
   { metaFetch :: FetchId,
-    metaId :: SnapshotId,
+    metaApiResponse :: ApiResponseId,
+    metaApiIndex :: Maybe Word32,
     metaContent :: Content,
     metaApiVersion :: ApiVersion,
     metaFilter :: FilterId,
@@ -225,7 +152,7 @@ deriveProdData
   ''Metadata
 
 data ListContent = LcNormal
-  { lcContent :: Digest,
+  { lcContent :: DataId,
     lcFull :: Bool
   }
   deriving (Show)
@@ -239,7 +166,7 @@ deriveSumData
 
 data ListMeta = ListMeta
   { listFetch :: FetchId,
-    listId :: ApiResponseId,
+    listApiResponse :: ApiResponseId,
     listContent :: ListContent,
     listApiVersion :: ApiVersion,
     listTimestamp :: Timestamp

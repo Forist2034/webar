@@ -5,17 +5,17 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Webar.Server.StackExchange.Api.Object where
+module Webar.Server.StackExchange.Api.Model where
 
 import Data.Aeson
 import Data.Aeson.TH (deriveFromJSON)
 import qualified Data.Text as T
 import Data.Vector (Vector)
 import Data.Word (Word64)
-import Webar.Server.StackExchange.Api.ToFilter
+import Webar.Server.StackExchange.Api.Filter.Internal
 import Webar.Server.StackExchange.Types
 
-type Tags = Vector TagName
+type Tags = Maybe (Vector TagName)
 
 newtype Date = Date Word64
   deriving (Show, Eq, Ord)

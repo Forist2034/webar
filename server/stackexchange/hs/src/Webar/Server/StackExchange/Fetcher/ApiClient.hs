@@ -9,8 +9,9 @@ import Data.Text (Text)
 import Data.Word (Word32)
 import Webar.Data.Cbor.TH
 import Webar.Http (Method)
-import Webar.Server.StackExchange.Api.Source
-import Webar.Server.StackExchange.Types (ApiSiteParameter, FilterId)
+import Webar.Server.StackExchange.Api.Filter (FilterId)
+import Webar.Server.StackExchange.Api.Request
+import Webar.Server.StackExchange.Api.Types (ApiSiteParameter, ApiVersion)
 
 data HttpRequest = HttpRequest
   { hrMethod :: Method,

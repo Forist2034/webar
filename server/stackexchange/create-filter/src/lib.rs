@@ -7,7 +7,7 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 
 use webar_data::bytes::ByteBuf;
-use webar_stackexchange_core::api;
+use webar_stackexchange_core::api::model;
 
 #[derive(Debug)]
 pub enum CreateError {
@@ -63,7 +63,7 @@ impl<'a> FilterConfig<'a> {
         }
         ret
     }
-    pub fn create(&self, client: &Client) -> Result<(ByteBuf, api::Filter<String>), CreateError> {
+    pub fn create(&self, client: &Client) -> Result<(ByteBuf, model::Filter<String>), CreateError> {
         let bs: Vec<u8> = client
             .get("https://api.stackexchange.com/2.3/filters/create")
             .query(&[("include", self.included_param())])
@@ -76,8 +76,8 @@ impl<'a> FilterConfig<'a> {
             .bytes()
             .map_err(CreateError::Http)?
             .into();
-        let v = match serde_json::from_slice::<api::Wrapper<[api::Filter<String>; 1]>>(&bs) {
-            Ok(api::Wrapper { items: [v], .. }) => v,
+        let v = match serde_json::from_slice::<model::Wrapper<[model::Filter<String>; 1]>>(&bs) {
+            Ok(model::Wrapper { items: [v], .. }) => v,
             Err(e) => return Err(CreateError::Json(e)),
         };
         Ok((ByteBuf(bs), v))

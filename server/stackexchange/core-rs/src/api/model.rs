@@ -3,15 +3,15 @@ use std::fmt::Display;
 use serde::Deserialize;
 
 use crate::{
+    api::request::ApiObjectType,
     id::{
         AccountId, AnswerId, BadgeId, CollectiveSlug, CommentId, QuestionId, RevisionId, TagName,
         UserId,
     },
-    ObjectType,
 };
 
-pub trait Object: serde::de::DeserializeOwned {
-    const TYPE: ObjectType;
+pub trait ApiObject: serde::de::DeserializeOwned {
+    const TYPE: ApiObjectType;
     type Id<'a>: Display
     where
         Self: 'a;
@@ -39,14 +39,15 @@ pub struct Answer {
     pub question_id: QuestionId,
     #[serde(default)]
     pub collectives: Vec<CollectiveRef>,
+    #[serde(default)]
     pub tags: Vec<TagName<String>>,
     #[serde(default)]
     pub last_editor: Option<ShallowUser>,
     #[serde(default)]
     pub owner: Option<ShallowUser>,
 }
-impl Object for Answer {
-    const TYPE: ObjectType = ObjectType::Answer;
+impl ApiObject for Answer {
+    const TYPE: ApiObjectType = ApiObjectType::Answer;
     type Id<'a> = AnswerId;
     type OwnedId = AnswerId;
     fn id(&self) -> Self::Id<'_> {
@@ -72,8 +73,8 @@ pub struct Comment {
     #[serde(default)]
     pub owner: Option<ShallowUser>,
 }
-impl Object for Comment {
-    const TYPE: ObjectType = ObjectType::Comment;
+impl ApiObject for Comment {
+    const TYPE: ApiObjectType = ApiObjectType::Comment;
     type Id<'a> = CommentId;
     type OwnedId = CommentId;
     fn id(&self) -> Self::Id<'_> {
@@ -88,8 +89,8 @@ impl Object for Comment {
 pub struct Badge {
     pub badge_id: BadgeId,
 }
-impl Object for Badge {
-    const TYPE: ObjectType = ObjectType::Badge;
+impl ApiObject for Badge {
+    const TYPE: ApiObjectType = ApiObjectType::Badge;
     type Id<'a> = BadgeId;
     type OwnedId = BadgeId;
     fn id(&self) -> Self::Id<'_> {
@@ -103,10 +104,11 @@ impl Object for Badge {
 #[derive(Deserialize)]
 pub struct Collective {
     pub slug: CollectiveSlug<String>,
+    #[serde(default)]
     pub tags: Vec<TagName<String>>,
 }
-impl Object for Collective {
-    const TYPE: ObjectType = ObjectType::Collective;
+impl ApiObject for Collective {
+    const TYPE: ApiObjectType = ApiObjectType::Collective;
     type Id<'a> = CollectiveSlug<&'a str>;
     type OwnedId = CollectiveSlug<String>;
     fn id(&self) -> Self::Id<'_> {
@@ -123,8 +125,8 @@ pub struct Revision {
     pub post_id: u64,
     pub post_type: PostType,
 }
-impl Object for Revision {
-    const TYPE: ObjectType = ObjectType::Revision;
+impl ApiObject for Revision {
+    const TYPE: ApiObjectType = ApiObjectType::Revision;
     type Id<'a> = RevisionId;
     type OwnedId = RevisionId;
     fn id(&self) -> Self::Id<'_> {
@@ -143,8 +145,8 @@ pub struct Tag {
     #[serde(default)]
     pub synonyms: Vec<TagName<String>>,
 }
-impl Object for Tag {
-    const TYPE: ObjectType = ObjectType::Tag;
+impl ApiObject for Tag {
+    const TYPE: ApiObjectType = ApiObjectType::Tag;
     type Id<'a> = TagName<&'a str>;
     type OwnedId = TagName<String>;
     fn id(&self) -> Self::Id<'_> {
@@ -160,8 +162,8 @@ pub struct TagSynonym {
     pub from_tag: TagName<String>,
     pub to_tag: TagName<String>,
 }
-impl Object for TagSynonym {
-    const TYPE: ObjectType = ObjectType::TagSynonym;
+impl ApiObject for TagSynonym {
+    const TYPE: ApiObjectType = ApiObjectType::TagSynonym;
     type Id<'a> = TagName<&'a str>;
     type OwnedId = TagName<String>;
     fn id(&self) -> Self::Id<'_> {
@@ -180,8 +182,8 @@ pub struct TagWiki {
     pub last_excerpt_editor: Option<ShallowUser>,
     pub tag_name: TagName<String>,
 }
-impl Object for TagWiki {
-    const TYPE: ObjectType = ObjectType::TagWiki;
+impl ApiObject for TagWiki {
+    const TYPE: ApiObjectType = ApiObjectType::TagWiki;
     type Id<'a> = TagName<&'a str>;
     type OwnedId = TagName<String>;
     fn id(&self) -> Self::Id<'_> {
@@ -204,8 +206,8 @@ pub struct User {
     pub collectives: Vec<CollectiveMembership>,
     pub user_id: UserId,
 }
-impl Object for User {
-    const TYPE: ObjectType = ObjectType::User;
+impl ApiObject for User {
+    const TYPE: ApiObjectType = ApiObjectType::User;
     type Id<'a> = UserId;
     type OwnedId = UserId;
     fn id(&self) -> Self::Id<'_> {
@@ -221,14 +223,15 @@ pub struct Question {
     pub question_id: QuestionId,
     #[serde(default)]
     pub collectives: Vec<CollectiveRef>,
+    #[serde(default)]
     pub tags: Vec<TagName<String>>,
     #[serde(default)]
     pub last_editor: Option<ShallowUser>,
     #[serde(default)]
     pub owner: Option<ShallowUser>,
 }
-impl Object for Question {
-    const TYPE: ObjectType = ObjectType::Question;
+impl ApiObject for Question {
+    const TYPE: ApiObjectType = ApiObjectType::Question;
     type Id<'a> = QuestionId;
     type OwnedId = QuestionId;
     fn id(&self) -> Self::Id<'_> {

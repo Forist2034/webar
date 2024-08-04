@@ -3,12 +3,13 @@
 {-# LANGUAGE TypeApplications #-}
 
 module Webar.Digest
-  ( Sha256,
-    sha256Hash,
+  ( SubDir (..),
+    Sha256,
     sha256SubDir,
     sha256ToString,
-    sha256Handle,
     Digest (..),
+    hashBytes,
+    hashHandle,
   )
 where
 
@@ -25,11 +26,18 @@ import qualified Data.ByteArray.Encoding as BAE
 import Data.Coerce (coerce)
 import Data.Primitive.ByteArray
 import qualified Data.Text.Encoding as TE
+import Data.Word (Word8)
 import System.IO
 import Webar.Data.Cbor
 import Webar.Data.Json
 import Webar.Data.TH
-import Webar.Types (SubDir (..))
+
+-- | sub directory of store path e.g. 1a in sha256-1a/1abcd34567,
+-- may use less than 16 bits
+data SubDir
+  = SubDir
+      {-# UNPACK #-} !Word8
+      {-# UNPACK #-} !Word8
 
 digestToJson :: H.Digest a -> AE.Encoding
 digestToJson d = AE.text (TE.decodeASCII (BAE.convertToBase BAE.Base16 d))
@@ -60,9 +68,6 @@ digestFromCbor msg =
 newtype Sha256 = Sha256 (H.Digest H.SHA256)
   deriving (Show, Eq, Ord)
 
-sha256Hash :: (BA.ByteArrayAccess ba) => ba -> Sha256
-sha256Hash ba = Sha256 (H.hash ba)
-
 instance ToJSON Sha256 where
   toJson (Sha256 d) = digestToJson d
 
@@ -79,26 +84,7 @@ sha256ToString :: Sha256 -> String
 sha256ToString (Sha256 s) = show s
 
 sha256SubDir :: Sha256 -> SubDir
-sha256SubDir (Sha256 s) =
-  SubDir (BA.index s 0) (BA.index s 1) (BA.index s 2) (BA.index s 3)
-
-sha256Handle :: Handle -> IO Sha256
-sha256Handle h = do
-  ctx <- H.IO.hashMutableInit
-  buf <- newPinnedByteArray bufSize
-  hashHandle ctx buf
-  where
-    bufSize = 1024 * 1024 * 64
-
-    hashHandle ctx buf = do
-      l <- withMutableByteArrayContents buf (\ptr -> hGetBuf h ptr bufSize)
-      if l == 0
-        then Sha256 <$> H.IO.hashMutableFinalize ctx
-        else
-          withMutableByteArrayContents
-            buf
-            (\ptr -> H.IO.hashMutableUpdate ctx (BA.MemView ptr l))
-            >> hashHandle ctx buf
+sha256SubDir (Sha256 s) = SubDir (BA.index s 0) (BA.index s 1)
 
 newtype Digest = DSha256 Sha256
   deriving (Show, Eq, Ord)
@@ -109,3 +95,24 @@ deriveSumData
       constructorTagModifier = camelTo2 '_' . tail
     }
   ''Digest
+
+hashBytes :: (BA.ByteArrayAccess ba) => ba -> Digest
+hashBytes bs = DSha256 (Sha256 (H.hash bs))
+
+hashHandle :: Handle -> IO Digest
+hashHandle h = do
+  ctx <- H.IO.hashMutableInit
+  buf <- newPinnedByteArray bufSize
+  doHash ctx buf
+  where
+    bufSize = 16 * 1024
+
+    doHash ctx buf = do
+      l <- withMutableByteArrayContents buf (\ptr -> hGetBuf h ptr bufSize)
+      if l == 0
+        then DSha256 . Sha256 <$> H.IO.hashMutableFinalize ctx
+        else
+          withMutableByteArrayContents
+            buf
+            (\ptr -> H.IO.hashMutableUpdate ctx (BA.MemView ptr l))
+            >> doHash ctx buf
