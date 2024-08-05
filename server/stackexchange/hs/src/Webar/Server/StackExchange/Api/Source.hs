@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Webar.Server.StackExchange.Api.Source
-  ( --  * Archive info
+  ( -- * Archive info
     ArchiveAnswer (..),
     ArchiveBadge (..),
     ArchiveComment (..),
@@ -15,13 +15,13 @@ module Webar.Server.StackExchange.Api.Source
     ArchiveTagSynonym (..),
     ArchiveUser (..),
     ArchiveSiteData (..),
-    --  * Snapshot info
+    -- * Snapshot info
     ApiSnapshotType (..),
-    --  ** api object
+    -- ** api object
     ApiData,
     Content (..),
     ObjectMeta (..),
-    --  ** item list
+    -- ** item list
     ListData,
     ListContent (..),
     ListMeta (..),
