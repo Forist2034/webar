@@ -1,7 +1,7 @@
 module Webar.Blob.Internal where
 
-import Webar.Bytes (ByteArrayAccess)
+import Webar.Bytes (ByteBuffer)
 
 -- | provide information about blob data so that store can perform optimization,
 --  methods is not stable now
-class (ByteArrayAccess t) => BlobData t
+class (ByteBuffer t) => BlobData t

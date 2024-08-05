@@ -23,7 +23,6 @@ import System.IO.Error
 import qualified System.Posix.ByteString as P
 import System.Posix.ByteString.FilePath
 import System.Posix.Types
-import Webar.Bytes (ByteArrayAccess)
 import qualified Webar.Bytes as Bytes
 
 foreign import ccall unsafe "mkdirat"
@@ -43,11 +42,11 @@ dropFileName p = case BS.unsnoc p of
 buildPath :: BSB.Builder -> RawFilePath
 buildPath = BS.toStrict . BSB.toLazyByteString
 
-createFileAt :: (ByteArrayAccess b) => Fd -> RawFilePath -> b -> IO ()
+createFileAt :: (Bytes.ByteBuffer b) => Fd -> RawFilePath -> b -> IO ()
 createFileAt atFd p buf =
-  Bytes.withByteArray
+  Bytes.withBuffer
     buf
-    ( \ptr ->
+    ( \(Bytes.Buffer ptr len) ->
         bracket
           ( P.openFdAt
               (Just atFd)
@@ -56,7 +55,7 @@ createFileAt atFd p buf =
               P.defaultFileFlags {P.exclusive = True, P.creat = Just 0o444}
           )
           P.closeFd
-          (write ptr (fromIntegral (Bytes.length buf)))
+          (write ptr (fromIntegral len))
     )
   where
     write _ 0 _ = pure ()

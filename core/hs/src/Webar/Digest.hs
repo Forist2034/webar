@@ -27,10 +27,14 @@ import Data.Coerce (coerce)
 import Data.Primitive.ByteArray
 import qualified Data.Text.Encoding as TE
 import Data.Word (Word8)
+import Foreign.Ptr (castPtr)
 import System.IO
+import qualified Webar.Bytes as Bytes
 import Webar.Data.Cbor
 import Webar.Data.Json
 import Webar.Data.TH
+
+-- TODO: replace cryptonite
 
 -- | sub directory of store path e.g. 1a in sha256-1a/1abcd34567,
 -- may use less than 16 bits
@@ -96,8 +100,15 @@ deriveSumData
     }
   ''Digest
 
-hashBytes :: (BA.ByteArrayAccess ba) => ba -> Digest
-hashBytes bs = DSha256 (Sha256 (H.hash bs))
+newtype BufView t = BufView t
+
+instance (Bytes.ByteBuffer t) => BA.ByteArrayAccess (BufView t) where
+  length (BufView t) = Bytes.length t
+  withByteArray (BufView t) f =
+    Bytes.withBuffer t (\(Bytes.Buffer ptr _) -> f (castPtr ptr))
+
+hashBytes :: (Bytes.ByteBuffer ba) => ba -> Digest
+hashBytes bs = DSha256 (Sha256 (H.hash (BufView bs)))
 
 hashHandle :: Handle -> IO Digest
 hashHandle h = do

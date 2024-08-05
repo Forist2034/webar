@@ -5,14 +5,14 @@ module Webar.Server.StackExchange.Api.Internal.BlobData where
 
 import qualified Data.Set as S
 import Webar.Blob
-import Webar.Bytes (ByteArrayAccess)
+import Webar.Bytes (ByteBuffer)
 import qualified Webar.Server.StackExchange.Api.Model as Api
 
 newtype ApiData t = ApiData (BinJsonData t)
-  deriving (ByteArrayAccess, BlobData)
+  deriving (ByteBuffer, BlobData)
 
 newtype ListData t = ListData (CborData (S.Set t))
-  deriving (ByteArrayAccess, BlobData)
+  deriving (ByteBuffer, BlobData)
 
 newtype FilterData = FilterData (BinJsonData Api.Filter)
-  deriving (ByteArrayAccess, BlobData)
+  deriving (ByteBuffer, BlobData)

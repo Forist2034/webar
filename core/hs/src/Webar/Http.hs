@@ -21,7 +21,7 @@ import Data.Text (Text)
 import qualified Data.Vector as V
 import Data.Word (Word16)
 import Webar.Blob.Internal (BlobData)
-import Webar.Bytes (ByteArrayAccess)
+import Webar.Bytes (ByteBuffer)
 import Webar.Data.Cbor (FromCbor (..), ToCbor (..))
 import Webar.Data.Cbor.TH
 import Webar.Types (Timestamp)
@@ -78,7 +78,7 @@ instance FromCbor HeaderMap where
         pure (Header name values : r)
 
 newtype JsonBody = JsonBody {jsonBody :: ByteString}
-  deriving (Show, ByteArrayAccess, FromCbor)
+  deriving (Show, ByteBuffer, FromCbor)
 
 instance BlobData JsonBody
 
