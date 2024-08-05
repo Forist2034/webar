@@ -6,6 +6,7 @@ module Webar.Http
   ( StatusCode,
     Method,
     HeaderMap,
+    JsonBody (..),
     Response (..),
   )
 where
@@ -14,10 +15,13 @@ import qualified Codec.CBOR.ByteArray as BA
 import qualified Codec.CBOR.ByteArray.Sliced as SBA
 import Codec.CBOR.Decoding
 import Codec.CBOR.Encoding
+import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.Text (Text)
 import qualified Data.Vector as V
 import Data.Word (Word16)
+import Webar.Blob.Internal (BlobData)
+import Webar.Bytes (ByteArrayAccess)
 import Webar.Data.Cbor (FromCbor (..), ToCbor (..))
 import Webar.Data.Cbor.TH
 import Webar.Types (Timestamp)
@@ -72,6 +76,11 @@ instance FromCbor HeaderMap where
         values <- fromCbor
         r <- go (n - 1)
         pure (Header name values : r)
+
+newtype JsonBody = JsonBody {jsonBody :: ByteString}
+  deriving (Show, ByteArrayAccess, FromCbor)
+
+instance BlobData JsonBody
 
 data Response i b = Response
   { respId :: i,

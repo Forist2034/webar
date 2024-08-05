@@ -2,11 +2,36 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Webar.Server.StackExchange.Api.Source where
+module Webar.Server.StackExchange.Api.Source
+  ( --  * Archive info
+    ArchiveAnswer (..),
+    ArchiveBadge (..),
+    ArchiveComment (..),
+    ArchiveCollective (..),
+    ArchiveRevision (..),
+    ArchiveQuestion (..),
+    ArchiveTag (..),
+    ArchiveTagWiki (..),
+    ArchiveTagSynonym (..),
+    ArchiveUser (..),
+    ArchiveSiteData (..),
+    --  * Snapshot info
+    ApiSnapshotType (..),
+    --  ** api object
+    ApiData,
+    Content (..),
+    ObjectMeta (..),
+    --  ** item list
+    ListData,
+    ListContent (..),
+    ListMeta (..),
+  )
+where
 
+import Webar.Blob (BlobId)
 import Webar.Data.TH
-import Webar.Object (DataId)
 import Webar.Server.StackExchange.Api.Filter (FilterId)
+import Webar.Server.StackExchange.Api.Internal.BlobData
 import Webar.Server.StackExchange.Api.Request
   ( ApiResponseId,
     FetchId,
@@ -104,8 +129,8 @@ deriveSumData
     }
   ''ApiSnapshotType
 
-newtype Content
-  = CNormal DataId
+newtype Content t
+  = CNormal (BlobId (ApiData t))
   deriving (Show)
 
 deriveSumData
@@ -115,10 +140,10 @@ deriveSumData
     }
   ''Content
 
-data ObjectMeta = ObjectMeta
+data ObjectMeta t = ObjectMeta
   { objFetch :: FetchId,
     objApiResponse :: ApiResponseId,
-    objContent :: Content,
+    objContent :: Content t,
     objApiVersion :: ApiVersion,
     objFilter :: FilterId,
     objTimestamp :: Timestamp
@@ -129,8 +154,8 @@ deriveProdData
   ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''ObjectMeta
 
-data ListContent = LcNormal
-  { lcContent :: DataId,
+data ListContent t = LcNormal
+  { lcContent :: BlobId (ListData t),
     lcFull :: Bool
   }
   deriving (Show)
@@ -142,10 +167,10 @@ deriveSumData
     }
   ''ListContent
 
-data ListMeta = ListMeta
+data ListMeta t = ListMeta
   { listFetch :: FetchId,
     listApiResponse :: ApiResponseId,
-    listContent :: ListContent,
+    listContent :: ListContent t,
     listApiVersion :: ApiVersion,
     listTimestamp :: Timestamp
   }

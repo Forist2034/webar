@@ -9,8 +9,8 @@ build-type:    Simple
 
 library
     exposed-modules:
-        Webar.Store.Data.Base
-        Webar.Store.Data.WithShared
+        Webar.Store.Blob.Base
+        Webar.Store.Blob.WithShared
         Webar.Store.Object.Base
         Webar.Store.Object.Website
         Webar.Fetch.Http.Store

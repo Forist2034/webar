@@ -15,6 +15,7 @@ library
         Webar.Server.StackExchange.Api.Request
         Webar.Server.StackExchange.Api.Model
         Webar.Server.StackExchange.Api.Source
+        Webar.Server.StackExchange.Api.Internal.BlobData
         Webar.Server.StackExchange.Source
         Webar.Server.StackExchange.Fetcher.ApiClient
 

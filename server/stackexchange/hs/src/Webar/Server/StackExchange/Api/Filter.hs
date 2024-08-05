@@ -3,7 +3,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Webar.Server.StackExchange.Api.Filter
-  ( FilterInfo (..),
+  ( FilterData,
+    FilterInfo (..),
     FilterId,
     FilterSpec (..),
     TypeMap (..),
@@ -15,16 +16,18 @@ where
 
 import Data.Proxy (Proxy)
 import Data.Text (Text)
+import Webar.Blob
 import Webar.Data.TH
 import Webar.Object
 import Webar.Server.StackExchange.Api.Filter.Internal
+import Webar.Server.StackExchange.Api.Internal.BlobData
 import Webar.Server.StackExchange.Api.Types (ApiVersion)
 
 data FilterInfo = FilterInfo
   { fiName :: Text,
     fiApiVersion :: ApiVersion,
     fiSafe :: Bool,
-    fiBody :: DataId
+    fiBody :: BlobId FilterData
   }
   deriving (Show)
 

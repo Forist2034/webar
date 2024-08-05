@@ -30,6 +30,7 @@ import Data.Word (Word32)
 import System.Environment (getArgs)
 import System.FilePath
 import System.IO (hPutStrLn, stderr)
+import Webar.Blob
 import qualified Webar.Data.BinJson as BinJson
 import qualified Webar.Data.Cbor as Cbor
 import qualified Webar.Data.Json as Json
@@ -37,15 +38,16 @@ import Webar.Fetch.Http.Store (addWiresharkFetch)
 import Webar.Http
 import Webar.Object
 import Webar.Server.StackExchange.Api.Filter (FilterId)
+import Webar.Server.StackExchange.Api.Internal.BlobData
 import qualified Webar.Server.StackExchange.Api.Model as Api
 import Webar.Server.StackExchange.Api.Request
 import Webar.Server.StackExchange.Api.Source
 import Webar.Server.StackExchange.Api.Types
 import Webar.Server.StackExchange.Fetcher.ApiClient
 import Webar.Server.StackExchange.Source
-import qualified Webar.Store.Data.Base as DS.B
-import Webar.Store.Data.WithShared (DataStore)
-import qualified Webar.Store.Data.WithShared as DS
+import qualified Webar.Store.Blob.Base as DS.B
+import Webar.Store.Blob.WithShared (BlobStore)
+import qualified Webar.Store.Blob.WithShared as DS
 import qualified Webar.Store.Object.Base as OS.B
 import qualified Webar.Store.Object.Website as OS
 import Webar.Types (Timestamp)
@@ -53,7 +55,7 @@ import Webar.Types (Timestamp)
 type ObjectStore = OS.ObjectStore () ArchiveInfo SnapshotType RecordType
 
 data Context = Context
-  { ctxDataStore :: !DataStore,
+  { ctxDataStore :: !BlobStore,
     ctxObjectStore :: !ObjectStore,
     ctxFetchId :: !FetchId
   }
@@ -65,7 +67,7 @@ addHttpResponse ::
   HttpRequest ->
   IO HttpResponseId
 addHttpResponse ctx callSeq respIdx req =
-  DS.addByteString ctx.ctxDataStore req.hrResponse.respBody >>= \body ->
+  DS.addBlob ctx.ctxDataStore req.hrResponse.respBody >>= \body ->
     OS.objectId
       <$> OS.addObject
         ctx.ctxObjectStore
@@ -77,7 +79,7 @@ addHttpResponse ctx callSeq respIdx req =
             hiRequestId = hrRequestId req,
             hiCallSeq = callSeq,
             hiResponseIndex = fromIntegral respIdx,
-            hiResponse = (hrResponse req) {respBody = body.dataId}
+            hiResponse = (hrResponse req) {respBody = body.blobId}
           }
 
 addApiResponse :: Context -> ApiInfo -> IO ApiResponseId
@@ -100,7 +102,7 @@ data ItemMeta = ItemMeta
 
 addApiItem :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> a -> IO ()
 addApiItem ctx meta archive bv =
-  DS.addByteString ctx.ctxDataStore (Cbor.encodeStrictBs bv) >>= \dat ->
+  DS.addBlob ctx.ctxDataStore (ApiData (BinJsonData (Cbor.encodeStrictBs bv))) >>= \dat ->
     addSnapshot
       ctx
       (AiSiteApi meta.imSite archive)
@@ -108,7 +110,7 @@ addApiItem ctx meta archive bv =
       ObjectMeta
         { objFetch = ctx.ctxFetchId,
           objApiResponse = meta.imApiResponseId,
-          objContent = CNormal dat.dataId,
+          objContent = CNormal dat.blobId,
           objApiVersion = meta.imApiVersion,
           objFilter = meta.imFilter,
           objTimestamp = meta.imTimestamp
@@ -116,7 +118,7 @@ addApiItem ctx meta archive bv =
 
 addItemList :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> Bool -> S.Set a -> IO ()
 addItemList ctx meta archive full v =
-  DS.addByteString ctx.ctxDataStore (Cbor.encodeStrictBs v) >>= \dat ->
+  DS.addBlob ctx.ctxDataStore (ListData (CborData (Cbor.encodeStrictBs v))) >>= \dat ->
     addSnapshot
       ctx
       (AiSiteApi meta.imSite archive)
@@ -124,7 +126,7 @@ addItemList ctx meta archive full v =
       ListMeta
         { listFetch = ctx.ctxFetchId,
           listApiResponse = meta.imApiResponseId,
-          listContent = LcNormal {lcContent = dat.dataId, lcFull = full},
+          listContent = LcNormal {lcContent = dat.blobId, lcFull = full},
           listApiVersion = meta.imApiVersion,
           listTimestamp = meta.imTimestamp
         }
@@ -206,7 +208,7 @@ addItemListResp ctx (ListArgs meta full resp) archive _ = do
   ids <-
     V.foldM'
       ( \i r ->
-          Aeson.throwDecodeStrict (respBody (hrResponse r)) >>= \w ->
+          Aeson.throwDecodeStrict r.hrResponse.respBody.jsonBody >>= \w ->
             V.foldM'
               ( \acc val@(BinJson.WithBinValue _ obj) ->
                   S.insert (itemId obj) acc <$ addItem @a ctx meta val
@@ -222,7 +224,7 @@ addRevisionListResp :: Context -> ListArgs -> ArchiveSiteData -> IO ()
 addRevisionListResp ctx (ListArgs meta full resp) archive =
   let revs =
         V.foldr'
-          ( \r mp -> case Aeson.eitherDecodeStrict' (respBody (hrResponse r)) of
+          ( \r mp -> case Aeson.eitherDecodeStrict' r.hrResponse.respBody.jsonBody of
               Right (Api.Wrapper {Api.wItems = is}) ->
                 V.foldr'
                   ( \(BinJson.WithBinValue bv obj) ->
@@ -289,7 +291,7 @@ addEntry ctx bs =
                     imFilter = arFilter entry,
                     imTimestamp = respTimestamp (hrResponse resp)
                   }
-              body = respBody (hrResponse resp)
+              body = resp.hrResponse.respBody.jsonBody
           case ty of
             OtAnswer -> addItemsResp @Api.Answer ctx meta Proxy body
             OtBadge -> addItemsResp @Api.Badge ctx meta Proxy body
@@ -355,7 +357,7 @@ addEntry ctx bs =
                   let content =
                         V.concatMap
                           ( \r ->
-                              case Aeson.eitherDecodeStrict (respBody (hrResponse r)) of
+                              case Aeson.eitherDecodeStrict r.hrResponse.respBody.jsonBody of
                                 Right Api.Wrapper {Api.wItems = is} -> (is :: V.Vector BinJson.BinValue)
                                 Left e -> throw (Aeson.AesonException e)
                           )
@@ -377,14 +379,14 @@ addEntry ctx bs =
                 UlComment -> addItemListResp @Api.Comment ctx args (AsdUser u AUsrComment) Proxy
                 UlQuestion -> addItemListResp @Api.Question ctx args (AsdUser u AUsrQuestion) Proxy
 
-withDataStore :: FilePath -> FilePath -> (DataStore -> IO c) -> IO c
+withDataStore :: FilePath -> FilePath -> (BlobStore -> IO c) -> IO c
 withDataStore root serverRoot f =
   bracket
-    (DS.B.openByFilePath (root </> "store/data"))
+    (DS.B.openByFilePath (root </> "store/blob"))
     DS.B.close
     ( \baseData ->
         bracket
-          (DS.openByFilePath baseData (serverRoot </> "store/data"))
+          (DS.openByFilePath baseData (serverRoot </> "store/blob"))
           DS.close
           f
     )

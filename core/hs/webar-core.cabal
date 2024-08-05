@@ -16,9 +16,13 @@ library
         Webar.Types
         Webar.Http
         Webar.Fetch.Http
+        Webar.Fetch.Http.Internal
+        Webar.Bytes
         Webar.Object
+        Webar.Blob
 
     hs-source-dirs:     src
+    other-modules:      Webar.Blob.Internal
     default-language:   Haskell2010
     default-extensions: StrictData
     ghc-options:        -Wall

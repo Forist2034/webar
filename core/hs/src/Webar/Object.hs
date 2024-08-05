@@ -17,8 +17,7 @@
 --
 --  [@snapshot@]: one fetched data of a @archive@
 module Webar.Object
-  ( DataId (..),
-    Server (..),
+  ( Server (..),
     ObjectId (..),
     ObjectType (..),
     ObjectInfo (..),
@@ -35,12 +34,6 @@ import Webar.Data.Cbor (FromCbor (..), ToCbor (..))
 import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
 import Webar.Digest
-
--- | data id
---  Distinguish data and object using different store and id to avoid
---  collision.
-newtype DataId = DataId Digest
-  deriving (Show, Eq, Ord, FromCbor, ToCbor, FromJSON, ToJSON)
 
 data Server = Server
   { serverName :: {-# UNPACK #-} Text,

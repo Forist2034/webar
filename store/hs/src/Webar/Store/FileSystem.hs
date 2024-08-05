@@ -18,10 +18,13 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
 import Foreign.C
+import Foreign.Ptr (plusPtr)
 import System.IO.Error
 import qualified System.Posix.ByteString as P
 import System.Posix.ByteString.FilePath
 import System.Posix.Types
+import Webar.Bytes (ByteArrayAccess)
+import qualified Webar.Bytes as Bytes
 
 foreign import ccall unsafe "mkdirat"
   c_mkdirat :: CInt -> CString -> CMode -> IO CInt
@@ -40,23 +43,26 @@ dropFileName p = case BS.unsnoc p of
 buildPath :: BSB.Builder -> RawFilePath
 buildPath = BS.toStrict . BSB.toLazyByteString
 
-createFileAt :: Fd -> RawFilePath -> ByteString -> IO ()
-createFileAt atFd p content =
-  bracket
-    ( P.openFdAt
-        (Just atFd)
-        p
-        P.WriteOnly
-        P.defaultFileFlags {P.exclusive = True, P.creat = Just 0o444}
+createFileAt :: (ByteArrayAccess b) => Fd -> RawFilePath -> b -> IO ()
+createFileAt atFd p buf =
+  Bytes.withByteArray
+    buf
+    ( \ptr ->
+        bracket
+          ( P.openFdAt
+              (Just atFd)
+              p
+              P.WriteOnly
+              P.defaultFileFlags {P.exclusive = True, P.creat = Just 0o444}
+          )
+          P.closeFd
+          (write ptr (fromIntegral (Bytes.length buf)))
     )
-    P.closeFd
-    (write content)
   where
-    write bs fd
-      | BS.null bs = pure ()
-      | otherwise =
-          P.fdWrite fd bs >>= \l ->
-            write (BS.drop (fromIntegral l) bs) fd
+    write _ 0 _ = pure ()
+    write ptr cnt fd =
+      P.fdWriteBuf fd ptr cnt >>= \l ->
+        write (ptr `plusPtr` fromIntegral l) (cnt - l) fd
 
 createDirectoryAt :: Fd -> RawFilePath -> CMode -> IO ()
 createDirectoryAt (Fd fd) name m =

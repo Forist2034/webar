@@ -7,11 +7,12 @@ import Data.UUID.Types (UUID)
 import Data.Vector (Vector)
 import Data.Void (Void)
 import Data.Word (Word32)
+import Webar.Blob (BlobId)
 import Webar.Data.Cbor.TH
 import Webar.Data.TH
 import qualified Webar.Fetch.Http as F
 import qualified Webar.Http as H
-import Webar.Object
+import Webar.Object (ObjectId)
 import Webar.Server.StackExchange.Api.Filter (FilterId)
 import Webar.Server.StackExchange.Api.Types
 import Webar.Types (Timestamp)
@@ -46,7 +47,7 @@ data HttpInfo = HttpInfo
     hiCallSeq :: Word32,
     hiResponseIndex :: Word32,
     hiRequestId :: RequestId,
-    hiResponse :: Response DataId
+    hiResponse :: Response (BlobId H.JsonBody)
   }
   deriving (Show)
 

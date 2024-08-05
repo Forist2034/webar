@@ -11,17 +11,19 @@ import qualified Data.Text.Lazy.IO as LTIO
 import qualified Data.Vector as V
 import System.Environment (getArgs)
 import System.FilePath
+import Webar.Blob
 import Webar.Data.BinJson (WithBinValue (..))
 import qualified Webar.Data.BinJson as BinJson
 import qualified Webar.Data.Cbor as Cbor
 import Webar.Digest
 import Webar.Object
 import Webar.Server.StackExchange.Api.Filter
+import Webar.Server.StackExchange.Api.Internal.BlobData
 import Webar.Server.StackExchange.Api.Model (Filter (..), FilterType (..))
 import Webar.Server.StackExchange.Api.Types
 import Webar.Server.StackExchange.Source
-import qualified Webar.Store.Data.Base as DS.B
-import qualified Webar.Store.Data.WithShared as DS
+import qualified Webar.Store.Blob.Base as DS.B
+import qualified Webar.Store.Blob.WithShared as DS
 import qualified Webar.Store.Object.Base as OS.B
 import qualified Webar.Store.Object.Website as OS
 
@@ -76,12 +78,12 @@ typeMapToRust tm =
 
 type ObjectStore = OS.ObjectStore () ArchiveInfo SnapshotType RecordType
 
-addFilter :: DS.DataStore -> ObjectStore -> ByteString -> IO FilterSpec
+addFilter :: DS.BlobStore -> ObjectStore -> ByteString -> IO FilterSpec
 addFilter dataStore objStore resp = do
   WithBinValue bv fil <- case Aeson.eitherDecodeStrict resp of
     Right (Wrapper v) -> pure v
     Left e -> fail ("failed to decode response: " ++ e)
-  body <- DS.addByteString dataStore (Cbor.encodeStrictBs bv)
+  body <- DS.addBlob dataStore (FilterData (BinJsonData (Cbor.encodeStrictBs bv)))
   filterId <-
     OS.addObject
       objStore
@@ -94,7 +96,7 @@ addFilter dataStore objStore resp = do
             FtUnsafe -> False
             FtInvalid -> error "invalid filter",
           fiApiVersion = Api2_3,
-          fiBody = DS.dataId body
+          fiBody = DS.blobId body
         }
   pure
     FilterSpec
@@ -102,14 +104,14 @@ addFilter dataStore objStore resp = do
         fsId = OS.objectId filterId
       }
 
-withDataStore :: FilePath -> FilePath -> (DS.DataStore -> IO c) -> IO c
+withDataStore :: FilePath -> FilePath -> (DS.BlobStore -> IO c) -> IO c
 withDataStore root serverRoot f =
   bracket
-    (DS.B.openByFilePath (root </> "store/data"))
+    (DS.B.openByFilePath (root </> "store/blob"))
     DS.B.close
     ( \baseData ->
         bracket
-          (DS.openByFilePath baseData (serverRoot </> "store/data"))
+          (DS.openByFilePath baseData (serverRoot </> "store/blob"))
           DS.close
           f
     )

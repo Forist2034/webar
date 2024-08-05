@@ -1,21 +1,37 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+-- | Data is not add to store now, but may change in the future, so
+--    `DigestField` is only exported in the internal module
 module Webar.Fetch.Http
-  ( Traffic (..),
+  ( KeyLogId,
+    WiresharkDataId,
+    LogId,
+    RequestMetaId,
+    idToDigest,
+    Traffic (..),
     FetchInfo (..),
     FetchId,
   )
 where
 
 import Webar.Data.TH
+import Webar.Fetch.Http.Internal
 import Webar.Object
 import Webar.Types (Timestamp)
 
+type KeyLogId = DigestField KeyLog
+
+type WiresharkDataId = DigestField WiresharkData
+
+type LogId = DigestField Log
+
+type RequestMetaId = DigestField RequestMeta
+
 data Traffic = TWireshark
-  { twKeyLog :: DataId,
-    twRequestMeta :: DataId,
-    twData :: DataId
+  { twKeyLog :: KeyLogId,
+    twRequestMeta :: RequestMetaId,
+    twData :: WiresharkDataId
   }
   deriving (Show)
 
@@ -28,9 +44,9 @@ deriveSumData
 
 data FetchInfo l = FetchInfo
   { tiTimestamp :: Timestamp,
-    tiLog :: DataId,
+    tiLog :: LogId,
     tiUser :: Maybe l,
-    tiKeyLog :: Maybe DataId,
+    tiKeyLog :: Maybe KeyLogId,
     tiTraffic :: Traffic
   }
   deriving (Show)
