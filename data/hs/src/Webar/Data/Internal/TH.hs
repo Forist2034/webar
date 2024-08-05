@@ -48,43 +48,56 @@ data Class = Class
     clsFun :: Name
   }
 
-data ProductDec = ProductDec {dpRoles :: [Role], dpCon :: Con}
+data ProductDec = ProductDec
+  { dpRoles :: [Role],
+    dpTyVars :: [TyVarBndr ()],
+    dpCon :: Con
+  }
 
-reifyProductCon :: Name -> ConQ
+reifyProductCon :: Name -> Q ([TyVarBndr ()], Con)
 reifyProductCon n =
   reify n >>= \case
-    TyConI (DataD _ _ _ _ [c] _) -> pure c
-    TyConI (NewtypeD _ _ _ _ con _) -> pure con
+    TyConI (DataD _ _ tv _ [c] _) -> pure (tv, c)
+    TyConI (NewtypeD _ _ tv _ con _) -> pure (tv, con)
     _ -> fail "only data with single constructor or newtype decl is allowed"
 
 reifyProductDec :: Name -> Q ProductDec
 reifyProductDec n = do
-  con <- reifyProductCon n
+  (tv, con) <- reifyProductCon n
   roles <- reifyRoles n
-  pure ProductDec {dpRoles = roles, dpCon = con}
+  pure ProductDec {dpRoles = roles, dpTyVars = tv, dpCon = con}
 
-data SumDec = SumDec {dsRoles :: [Role], dsCons :: [Con]}
+data SumDec = SumDec
+  { dsRoles :: [Role],
+    dsTyVars :: [TyVarBndr ()],
+    dsCons :: [Con]
+  }
 
-reifySumCon :: Name -> Q [Con]
+reifySumCon :: Name -> Q ([TyVarBndr ()], [Con])
 reifySumCon n =
   reify n >>= \case
-    TyConI (DataD _ _ _ _ cs _) -> pure cs
-    TyConI (NewtypeD _ _ _ _ con _) -> pure [con]
+    TyConI (DataD _ _ tv _ cs _) -> pure (tv, cs)
+    TyConI (NewtypeD _ _ tv _ con _) -> pure (tv, [con])
     _ -> fail "only data or newtype decl is allowed"
 
 reifySumDec :: Name -> Q SumDec
 reifySumDec n = do
-  cons <- reifySumCon n
+  (tv, cons) <- reifySumCon n
   roles <- reifyRoles n
-  pure SumDec {dsRoles = roles, dsCons = cons}
+  pure SumDec {dsRoles = roles, dsTyVars = tv, dsCons = cons}
 
-mkInstance :: Class -> Name -> [Role] -> Exp -> DecsQ
-mkInstance cls ty rs e = do
+mkInstance :: Class -> Name -> [TyVarBndr ()] -> [Role] -> Exp -> DecsQ
+mkInstance cls ty tv rs e = do
   (constraints, tyWithArg) <-
     foldlM
-      ( \(cs, t) r -> do
-          tyArg <- newName "a"
-          case r of
+      ( \(cs, t) (var, role) -> do
+          tyArg <-
+            newName
+              ( case var of
+                  PlainTV (Name (OccName n) _) _ -> n
+                  KindedTV (Name (OccName n) _) _ _ -> n
+              )
+          case role of
             PhantomR -> pure (cs, AppT t (VarT tyArg))
             _ ->
               pure
@@ -93,7 +106,7 @@ mkInstance cls ty rs e = do
                 )
       )
       ([], ConT ty)
-      rs
+      (zip tv rs)
   pure
     [ InstanceD
         Nothing
@@ -201,22 +214,22 @@ sumToSerialize ser opt cs = do
   pure (LamE [VarP v] (CaseE (VarE v) matches))
 
 mkSerializeProd :: Serializer -> ProductOptions -> Name -> ExpQ
-mkSerializeProd ser opt n = reifyProductCon n >>= productToSerialize ser opt
+mkSerializeProd ser opt n = reifyProductCon n >>= productToSerialize ser opt . snd
 
 mkSerializeProdInst :: Class -> Serializer -> ProductOptions -> Name -> ProductDec -> DecsQ
 mkSerializeProdInst cls ser opt n d =
-  productToSerialize ser opt (dpCon d) >>= mkInstance cls n (dpRoles d)
+  productToSerialize ser opt (dpCon d) >>= mkInstance cls n (dpTyVars d) (dpRoles d)
 
 deriveSerializeProd :: Class -> Serializer -> ProductOptions -> Name -> DecsQ
 deriveSerializeProd cls ser opt n =
   reifyProductDec n >>= mkSerializeProdInst cls ser opt n
 
 mkSerializeSum :: Serializer -> SumOptions -> Name -> ExpQ
-mkSerializeSum ser opt n = reifySumCon n >>= sumToSerialize ser opt
+mkSerializeSum ser opt n = reifySumCon n >>= sumToSerialize ser opt . snd
 
 mkSerializeSumInst :: Class -> Serializer -> SumOptions -> Name -> SumDec -> DecsQ
 mkSerializeSumInst cls ser opt n d =
-  sumToSerialize ser opt (dsCons d) >>= mkInstance cls n (dsRoles d)
+  sumToSerialize ser opt (dsCons d) >>= mkInstance cls n (dsTyVars d) (dsRoles d)
 
 deriveSerializeSum :: Class -> Serializer -> SumOptions -> Name -> DecsQ
 deriveSerializeSum cls ser opt n =
@@ -324,11 +337,11 @@ deserializeToProd des opt ty (RecC cn fs) =
 deserializeToProd _ _ _ _ = error "Unsupported constructor"
 
 mkDeserializeProd :: Deserializer no ro s -> ProductOptions -> Name -> ExpQ
-mkDeserializeProd des opt n = reifyProductCon n >>= deserializeToProd des opt n
+mkDeserializeProd des opt n = reifyProductCon n >>= deserializeToProd des opt n . snd
 
 mkDeserializeProdInst :: Class -> Deserializer no ro s -> ProductOptions -> Name -> ProductDec -> DecsQ
 mkDeserializeProdInst cls des opt n d =
-  deserializeToProd des opt n (dpCon d) >>= mkInstance cls n (dpRoles d)
+  deserializeToProd des opt n (dpCon d) >>= mkInstance cls n (dpTyVars d) (dpRoles d)
 
 deriveDeserializeProd :: Class -> Deserializer no ro s -> ProductOptions -> Name -> DecsQ
 deriveDeserializeProd cls des opt n =
@@ -417,11 +430,11 @@ deserializeToSum des opt ty cs = do
         )
 
 mkDeserializeSum :: Deserializer no ro s -> SumOptions -> Name -> ExpQ
-mkDeserializeSum des opt n = reifySumCon n >>= deserializeToSum des opt n
+mkDeserializeSum des opt n = reifySumCon n >>= deserializeToSum des opt n . snd
 
 mkDeserializeSumInst :: Class -> Deserializer no ro s -> SumOptions -> Name -> SumDec -> DecsQ
 mkDeserializeSumInst cls des opt n d =
-  deserializeToSum des opt n (dsCons d) >>= mkInstance cls n (dsRoles d)
+  deserializeToSum des opt n (dsCons d) >>= mkInstance cls n (dsTyVars d) (dsRoles d)
 
 deriveDeserializeSum :: Class -> Deserializer no ro s -> SumOptions -> Name -> DecsQ
 deriveDeserializeSum cls des opt n =

@@ -50,6 +50,6 @@ test-suite data
         bytestring,
         hspec >=2.11 && <2.12,
         cryptonite,
-        filepath >=1.4.2 && <1.5,
+        filepath >=1.4.2 && <1.6,
         webar-core,
         webar-data

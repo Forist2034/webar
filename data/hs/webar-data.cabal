@@ -72,7 +72,7 @@ test-suite cbor
         text >=2.0.2 && <2.1,
         bytestring >=0.11.5 && <0.12,
         vector >=0.13.1 && <0.14,
-        filepath >=1.4.2 && <1.5,
+        filepath >=1.4.2 && <1.6,
         hspec >=2.11 && <2.12,
         webar-data,
         test-common
@@ -88,7 +88,7 @@ test-suite json
         text >=2.0.2 && <2.1,
         bytestring >=0.11.5 && <0.12,
         vector >=0.13.1 && <0.14,
-        filepath >=1.4.2 && <1.5,
+        filepath >=1.4.2 && <1.6,
         hspec >=2.11 && <2.12,
         webar-data,
         test-common
