@@ -8,6 +8,7 @@ module Webar.Fetch.Http
     WiresharkDataId,
     LogId,
     RequestMetaId,
+    FetchDataId,
     idToDigest,
     Traffic (..),
     FetchInfo (..),
@@ -17,7 +18,7 @@ where
 
 import Webar.Data.TH
 import Webar.Fetch.Http.Internal
-import Webar.Object
+import Webar.Object (ObjectId)
 import Webar.Types (Timestamp)
 
 type KeyLogId = DigestField KeyLog
@@ -27,6 +28,8 @@ type WiresharkDataId = DigestField WiresharkData
 type LogId = DigestField Log
 
 type RequestMetaId = DigestField RequestMeta
+
+type FetchDataId = DigestField FetchData
 
 data Traffic = TWireshark
   { twKeyLog :: KeyLogId,
@@ -46,8 +49,8 @@ data FetchInfo l = FetchInfo
   { tiTimestamp :: Timestamp,
     tiLog :: LogId,
     tiUser :: Maybe l,
-    tiKeyLog :: Maybe KeyLogId,
-    tiTraffic :: Traffic
+    tiFetchData :: FetchDataId,
+    tiTraffic :: Maybe Traffic
   }
   deriving (Show)
 

@@ -14,5 +14,7 @@ data WiresharkData
 
 data RequestMeta
 
+data FetchData
+
 newtype DigestField t = DigestField {idToDigest :: Digest}
   deriving (Show, Eq, FromCbor, ToCbor, FromJSON, ToJSON)
