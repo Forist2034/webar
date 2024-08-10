@@ -1,5 +1,5 @@
 [package]
-name = "webar-stackexchange-core"
+name = "webar-media-core"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
@@ -8,9 +8,7 @@ license.workspace = true
 
 [dependencies]
 serde.workspace = true
-serde_json.workspace = true
 uuid.workspace = true
-phf.workspace = true
 
-webar-core.workspace = true
 webar-data.workspace = true
+webar-core.workspace = true

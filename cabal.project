@@ -2,4 +2,5 @@ packages:
   ./data/hs/webar-data.cabal
   ./core/hs/webar-core.cabal
   ./store/hs/webar-store.cabal
+  ./media/hs/webar-media.cabal
   ./server/stackexchange/hs/webar-stackexchange.cabal

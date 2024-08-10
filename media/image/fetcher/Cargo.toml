@@ -1,0 +1,25 @@
+[package]
+name = "webar-image-fetcher"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde.workspace = true
+ciborium.workspace = true
+uuid.workspace = true
+rustix.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tar.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+
+webar-data.workspace = true
+webar-core.workspace = true
+webar-tracing.workspace = true
+webar-media-core.workspace = true
+webar-image-store.workspace = true

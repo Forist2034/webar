@@ -6,6 +6,7 @@ import Webar.Data.TH
 import Webar.Object
 import qualified Webar.Server.StackExchange.Api.Request as Api.Request
 import qualified Webar.Server.StackExchange.Api.Source as Api.Source
+import qualified Webar.Server.StackExchange.Image.Source as Img.Source
 import Webar.Server.StackExchange.Types (ApiSiteParameter)
 
 server :: Server
@@ -14,6 +15,7 @@ server = Server {serverName = "StackExchange", serverVersion = 1}
 data RecordType
   = RtApiRequest {-# UNPACK #-} Api.Request.RequestRecord
   | RtFilter
+  | RtImageRequest {-# UNPACK #-} Img.Source.RequestRecord
   deriving (Show, Eq)
 
 deriveSumData
@@ -25,6 +27,7 @@ deriveSumData
 
 data ArchiveInfo
   = AiSiteApi ApiSiteParameter Api.Source.ArchiveSiteData
+  | AiImage Img.Source.ArchiveImage
   deriving (Show, Eq)
 
 deriveSumData
@@ -36,8 +39,9 @@ deriveSumData
 
 type ArchiveId = ObjectId ArchiveInfo
 
-newtype SnapshotType
+data SnapshotType
   = StApi Api.Source.ApiSnapshotType
+  | StImage {-# UNPACK #-} Img.Source.SnapshotType
   deriving (Show, Eq)
 
 deriveSumData

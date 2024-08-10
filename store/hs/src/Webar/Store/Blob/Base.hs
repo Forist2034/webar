@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Webar.Store.Blob.Base
   ( BlobHandle (blobId),
@@ -14,6 +16,7 @@ where
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as BSB
+import Data.Proxy (Proxy (Proxy))
 import qualified System.Posix as P.FilePath
 import qualified System.Posix.ByteString as P
 import System.Posix.Types (Fd)
@@ -23,11 +26,11 @@ import Webar.Store.FileSystem
 
 data Path = Path !ByteString !ByteString
 
-toPath :: Digest -> Path
-toPath digest =
+toPath :: Bool -> Digest -> Path
+toPath img digest =
   let dataP =
         buildPath
-          ( "data/"
+          ( (if img then "media/" else "data/")
               <> ( case digest of
                      DSha256 sha256 ->
                        let SubDir s0 s1 = sha256SubDir sha256
@@ -53,10 +56,10 @@ openByFilePath fp =
       P.FilePath.ReadOnly
       P.FilePath.defaultFileFlags {P.FilePath.directory = True}
 
-addBlob :: (BlobData t) => BlobStore -> t -> IO (BlobHandle t)
+addBlob :: forall t. (BlobData t) => BlobStore -> t -> IO (BlobHandle t)
 addBlob (BlobStore fd) content =
   let digest = hashBytes content
-      path@(Path dir file) = toPath digest
+      path@(Path dir file) = toPath (isImage @t Proxy) digest
    in BlobHandle (BlobId digest) path
         <$ createReadOnlyDirAt fd dir (createFileAt fd file content)
 
@@ -68,12 +71,14 @@ linkHandle :: BlobStore -> BlobStore -> BlobHandle t -> IO ()
 linkHandle new old h = linkPath new old (blobPath h)
 
 linkBlob ::
+  forall t.
+  (BlobData t) =>
   BlobStore ->
   -- | old store
   BlobStore ->
   BlobId t ->
   IO ()
-linkBlob new old (BlobId d) = linkPath new old (toPath d)
+linkBlob new old (BlobId d) = linkPath new old (toPath (isImage @t Proxy) d)
 
 close :: BlobStore -> IO ()
 close (BlobStore fd) = P.closeFd fd

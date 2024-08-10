@@ -91,3 +91,7 @@ pub mod api {
 pub mod fetcher {
     pub mod api_client;
 }
+
+pub mod image {
+    pub mod source;
+}

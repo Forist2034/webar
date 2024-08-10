@@ -16,6 +16,7 @@ library
         Webar.Server.StackExchange.Api.Model
         Webar.Server.StackExchange.Api.Source
         Webar.Server.StackExchange.Api.Internal.BlobData
+        Webar.Server.StackExchange.Image.Source
         Webar.Server.StackExchange.Source
         Webar.Server.StackExchange.Fetcher.ApiClient
 
@@ -34,7 +35,8 @@ library
         containers >=0.6.7 && <0.7,
         template-haskell >=2.19.0 && <2.21,
         webar-core,
-        webar-data
+        webar-data,
+        webar-media
 
 executable se-filter-info
     main-is:          Main.hs
@@ -70,6 +72,7 @@ executable se-add-type-filter
 executable se-add-fetch
     main-is:          Main.hs
     hs-source-dirs:   app/add-fetch
+    other-modules:    Image
     default-language: Haskell2010
     ghc-options:      -Wall
     build-depends:
@@ -78,6 +81,9 @@ executable se-add-fetch
         bytestring >=0.11.5 && <0.12,
         vector >=0.13.1 && <0.14,
         containers >=0.6.7 && <0.7,
+        modern-uri >=0.3.6 && <0.4,
+        tagsoup >=0.14.8 && <0.15,
+        optparse-applicative >=0.18.1 && <0.19,
         aeson >=2.2.1 && <2.3,
         conduit >=1.3.5 && <1.4,
         tar-conduit >=0.4.1 && <0.5,
@@ -85,4 +91,5 @@ executable se-add-fetch
         webar-data,
         webar-core,
         webar-store,
+        webar-media,
         webar-stackexchange

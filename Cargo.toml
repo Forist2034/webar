@@ -4,11 +4,16 @@ members = [
   "./data/derive-rs",
   "./data/data-rs",
   "./core/rs",
+  "./store/rs",
   "./utils/rs/rustls",
   "./utils/rs/tracing",
+  "./media/core-rs",
+  "./media/image/store-rs",
+  "./media/image/fetcher",
   "./server/stackexchange/core-rs",
   "./server/stackexchange/create-filter",
   "./server/stackexchange/fetcher",
+  "server/stackexchange/image-fetcher",
 ]
 
 
@@ -36,6 +41,7 @@ const-hex = "1.11.3"
 tracing = "0.1.40"
 anyhow = "1.0.83"
 thiserror = "1.0.61"
+clap = { version = "4.5.11", features = ["derive"] }
 tar = "0.4.40"
 
 # projects
@@ -43,5 +49,9 @@ webar-data = { path = "./data/data-rs" }
 webar-core = { path = "./core/rs" }
 webar-tracing = { path = "./utils/rs/tracing" }
 webar-rustls = { path = "./utils/rs/rustls" }
+webar-store = { path = "./store/rs" }
+webar-media-core = { path = "./media/core-rs" }
+webar-image-store = { path = "./media/image/store-rs" }
+webar-image-fetcher = { path = "./media/image/fetcher" }
 webar-stackexchange-core = { path = "./server/stackexchange/core-rs" }
 webar-stackexchange-fetcher = { path = "./server/stackexchange/fetcher" }

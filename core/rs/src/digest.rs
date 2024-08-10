@@ -92,6 +92,12 @@ pub enum Digest {
     #[serde(rename = "sha256")]
     Sha256(Sha256),
 }
+impl Digest {
+    /// hash data with default algorithm
+    pub fn digest(data: &[u8]) -> Self {
+        Self::Sha256(Sha256::digest(data))
+    }
+}
 impl From<Sha256> for Digest {
     fn from(value: Sha256) -> Self {
         Self::Sha256(value)

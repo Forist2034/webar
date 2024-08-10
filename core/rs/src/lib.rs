@@ -8,6 +8,8 @@ pub mod digest;
 
 pub mod http;
 
+pub mod blob;
+
 pub mod object;
 
 pub mod fetch {

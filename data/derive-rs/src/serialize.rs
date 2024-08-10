@@ -15,6 +15,8 @@ use syn::{
 struct Bound {
     #[darling(default)]
     serialize: Option<String>,
+    #[darling(default, rename = "deserialize")]
+    _deserialize: Option<String>,
 }
 
 #[derive(FromAttributes)]

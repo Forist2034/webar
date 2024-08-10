@@ -23,11 +23,14 @@ import qualified Data.Conduit.Tar as Tar
 import Data.Foldable (traverse_)
 import Data.Functor (void)
 import qualified Data.Map.Strict as M
+import Data.Maybe (isJust)
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import Data.Word (Word32)
-import System.Environment (getArgs)
+import Image
+import Options.Applicative hiding (info)
+import qualified Options.Applicative as OptParse
 import System.FilePath
 import System.IO (hPutStrLn, stderr)
 import Webar.Blob
@@ -54,11 +57,53 @@ import Webar.Types (Timestamp)
 
 type ObjectStore = OS.ObjectStore () ArchiveInfo SnapshotType RecordType
 
+data Args = Args
+  { argProfileImages :: Maybe FilePath,
+    argContentImages :: Maybe FilePath,
+    argUnknownUrl :: Maybe FilePath,
+    argInvalidUrl :: Maybe FilePath,
+    argStoreRoot :: FilePath,
+    argServerRoot :: FilePath,
+    argFetchRoot :: FilePath
+  }
+
+parser :: Parser Args
+parser =
+  Args
+    <$> optional (strOption (long "profile-images" <> metavar "PATH"))
+    <*> optional (strOption (long "content-images" <> metavar "PATH"))
+    <*> optional (strOption (long "unknown-urls" <> metavar "PATH" <> help "unknown url file"))
+    <*> optional (strOption (long "invalid-urls" <> metavar "PATH" <> help "invalid url file"))
+    <*> strArgument (metavar "STORE_ROOT" <> help "path to file store")
+    <*> strArgument (metavar "SERVER_ROOT" <> help "path to store root")
+    <*> strArgument (metavar "FETCH_ROOT" <> help "path to fetch root")
+
 data Context = Context
   { ctxDataStore :: !BlobStore,
     ctxObjectStore :: !ObjectStore,
-    ctxFetchId :: !FetchId
+    ctxFetchId :: !FetchId,
+    ctxContentImages :: !Bool,
+    ctxProfileImages :: !Bool
   }
+
+data Summary = Summary
+  { sumContentImages :: !ImageSet,
+    sumProfileImages :: !ImageSet
+  }
+
+instance Semigroup Summary where
+  l <> r =
+    Summary
+      { sumContentImages = sumContentImages l <> sumContentImages r,
+        sumProfileImages = sumProfileImages l <> sumProfileImages r
+      }
+
+instance Monoid Summary where
+  mempty =
+    Summary
+      { sumContentImages = mempty,
+        sumProfileImages = mempty
+      }
 
 addHttpResponse ::
   Context ->
@@ -135,66 +180,98 @@ class (Json.FromJSON a, Cbor.ToCbor (Id a), Ord (Id a)) => Item a where
   type Id a
   archiveInfo :: a -> ArchiveSiteData
   itemId :: a -> Id a
+  addItemSummary :: Context -> a -> Summary -> Summary
+
+addHtmlContent :: Context -> HtmlContent -> Summary -> Summary
+addHtmlContent Context {ctxContentImages = True} (HtmlContent c) s =
+  s {sumContentImages = addContentImage c (sumContentImages s)}
+addHtmlContent Context {ctxContentImages = False} _ s = s
 
 instance Item Api.Answer where
   type Id Api.Answer = AnswerId
   archiveInfo ans = AsdAnswer ans.ansAnswerId AAnsInfo
   itemId = Api.ansAnswerId
+  addItemSummary ctx ans = addHtmlContent ctx (Api.ansBody ans)
 
 instance Item Api.Badge where
   type Id Api.Badge = BadgeId
   archiveInfo b = AsdBadge b.bBadgeId ABdgInfo
   itemId = Api.bBadgeId
+  addItemSummary ctx b = addHtmlContent ctx (Api.bDescription b)
 
 instance Item Api.Collective where
   type Id Api.Collective = CollectiveSlug
   archiveInfo col = AsdCollective col.colSlug AColInfo
   itemId = Api.colSlug
+  addItemSummary
+    Context {ctxContentImages = True}
+    Api.Collective {Api.colDescription = RawText t}
+    s =
+      s {sumContentImages = addContentImage t (sumContentImages s)}
+  addItemSummary _ _ s = s
 
 instance Item Api.Comment where
   type Id Api.Comment = CommentId
   archiveInfo com = AsdComment com.comCommentId AComInfo
   itemId = Api.comCommentId
+  addItemSummary ctx c = addHtmlContent ctx (Api.comBody c)
 
 instance Item Api.Question where
   type Id Api.Question = QuestionId
   archiveInfo q = AsdQuestion q.qQuestionId AQueInfo
   itemId = Api.qQuestionId
+  addItemSummary ctx q = addHtmlContent ctx (Api.qBody q)
 
 instance Item Api.Tag where
   type Id Api.Tag = TagName
   archiveInfo t = AsdTag t.tagName ATagInfo
   itemId = Api.tagName
+  addItemSummary _ _ s = s
 
 instance Item Api.TagSynonym where
   type Id Api.TagSynonym = TagName
   archiveInfo t = AsdTagSynonym t.tagSynFromTag ATSynInfo
   itemId = Api.tagSynFromTag
+  addItemSummary _ _ s = s
 
 instance Item Api.TagWiki where
   type Id Api.TagWiki = TagName
   archiveInfo t = AsdTagWiki t.twTagName ATWkInfo
   itemId = Api.twTagName
+  addItemSummary ctx w = addHtmlContent ctx (Api.twBody w)
 
 instance Item Api.User where
   type Id Api.User = UserId
   archiveInfo u = AsdUser u.usrUserId AUsrInfo
   itemId = Api.usrUserId
+  addItemSummary Context {ctxProfileImages = True} Api.User {Api.usrProfileImage = LinkUrl u} s =
+    s {sumProfileImages = addImageUrl u (sumProfileImages s)}
+  addItemSummary Context {ctxProfileImages = False} _ s = s
 
-addItem :: forall a. (Item a) => Context -> ItemMeta -> BinJson.WithBinValue a -> IO ()
-addItem ctx meta (BinJson.WithBinValue bv obj) =
-  addApiItem ctx meta (archiveInfo obj) bv
+addItem ::
+  forall a.
+  (Item a) =>
+  Context ->
+  Summary ->
+  ItemMeta ->
+  BinJson.WithBinValue a ->
+  IO Summary
+addItem ctx s meta (BinJson.WithBinValue bv obj) =
+  addItemSummary ctx obj s
+    <$ addApiItem ctx meta (archiveInfo obj) bv
 
-addItemsResp :: forall a. (Item a) => Context -> ItemMeta -> Proxy a -> ByteString -> IO ()
+addItemsResp :: forall a. (Item a) => Context -> ItemMeta -> Proxy a -> ByteString -> IO Summary
 addItemsResp ctx meta _ body =
   Aeson.throwDecodeStrict body >>= \Api.Wrapper {Api.wItems = is} ->
-    V.mapM_ (addItem @a ctx meta) is
+    V.foldM' (\s v -> addItem @a ctx s meta v) mempty is
 
 data ListArgs = ListArgs
   { lrMeta :: !ItemMeta,
     lrFull :: !Bool,
     lrResponses :: !(V.Vector HttpRequest)
   }
+
+data SummaryWithIds i = SummaryWithIds !Summary !(S.Set i)
 
 addItemListResp ::
   forall a.
@@ -203,49 +280,74 @@ addItemListResp ::
   ListArgs ->
   ArchiveSiteData ->
   Proxy a ->
-  IO ()
+  IO Summary
 addItemListResp ctx (ListArgs meta full resp) archive _ = do
-  ids <-
+  SummaryWithIds s ids <-
     V.foldM'
-      ( \i r ->
+      ( \si r ->
           Aeson.throwDecodeStrict r.hrResponse.respBody.jsonBody >>= \w ->
             V.foldM'
-              ( \acc val@(BinJson.WithBinValue _ obj) ->
-                  S.insert (itemId obj) acc <$ addItem @a ctx meta val
+              ( \(SummaryWithIds s i) val@(BinJson.WithBinValue _ obj) ->
+                  fmap
+                    (\updateS -> SummaryWithIds updateS (S.insert (itemId obj) i))
+                    (addItem @a ctx s meta val)
               )
-              i
+              si
               (Api.wItems w)
       )
-      S.empty
+      (SummaryWithIds mempty S.empty)
       resp
   addItemList ctx meta archive full ids
+  pure s
 
-addRevisionListResp :: Context -> ListArgs -> ArchiveSiteData -> IO ()
+addRevisionSummary :: Context -> Api.Revision -> Summary -> Summary
+addRevisionSummary Context {ctxContentImages = True} r initS@Summary {sumContentImages = s0} =
+  initS
+    { sumContentImages =
+        ( addContent (Api.revBody r)
+            . addContent (Api.revLastBody r)
+            . addContent (Api.revComment r)
+        )
+          s0
+    }
+  where
+    addContent (Just (HtmlContent c)) s = addContentImage c s
+    addContent Nothing s = s
+addRevisionSummary Context {ctxContentImages = False} _ s = s
+
+data SummaryWithRev = SummaryWithRev !Summary !(M.Map RevisionId [BinJson.BinValue])
+
+addRevisionListResp :: Context -> ListArgs -> ArchiveSiteData -> IO Summary
 addRevisionListResp ctx (ListArgs meta full resp) archive =
-  let revs =
+  let SummaryWithRev summary revs =
         V.foldr'
-          ( \r mp -> case Aeson.eitherDecodeStrict' r.hrResponse.respBody.jsonBody of
+          ( \r acc -> case Aeson.eitherDecodeStrict' r.hrResponse.respBody.jsonBody of
               Right (Api.Wrapper {Api.wItems = is}) ->
                 V.foldr'
-                  ( \(BinJson.WithBinValue bv obj) ->
-                      M.alter
-                        ( \case
-                            Just vs -> Just (bv : vs)
-                            Nothing -> Just [bv]
+                  ( \(BinJson.WithBinValue bv obj) (SummaryWithRev s mp) ->
+                      SummaryWithRev
+                        (addRevisionSummary ctx obj s)
+                        ( M.alter
+                            ( \case
+                                Just vs -> Just (bv : vs)
+                                Nothing -> Just [bv]
+                            )
+                            (Api.revRevisionGuid obj)
+                            mp
                         )
-                        (Api.revRevisionGuid obj)
                   )
-                  mp
+                  acc
                   is
               Left e -> throw (Aeson.AesonException e)
           )
-          M.empty
+          (SummaryWithRev mempty M.empty)
           resp
    in do
         traverse_
           (\(k, v) -> addApiItem ctx meta (AsdRevision k ARevInfo) v)
           (M.toAscList revs)
         addItemList ctx meta archive full (M.keysSet revs)
+        pure summary
 
 newtype Info = Info {infoSite :: BinJson.WithBinValue Api.Site}
 
@@ -265,7 +367,7 @@ instance Aeson.FromJSON InfoItem where
             else fail "multi item in site info"
       )
 
-addEntry :: Context -> LBS.ByteString -> IO ()
+addEntry :: Context -> LBS.ByteString -> IO Summary
 addEntry ctx bs =
   let entry = Cbor.decodeLazyBsThrow bs
    in case arData entry of
@@ -298,9 +400,25 @@ addEntry ctx bs =
             OtCollective -> addItemsResp @Api.Collective ctx meta Proxy body
             OtComment -> addItemsResp @Api.Comment ctx meta Proxy body
             OtInfo -> do
-              Api.Wrapper {Api.wItems = IInfo (Info {infoSite = BinJson.WithBinValue bv _})} <-
+              Api.Wrapper {Api.wItems = IInfo (Info {infoSite = BinJson.WithBinValue bv obj})} <-
                 Aeson.throwDecodeStrict body
               addApiItem ctx meta AsdInfo bv
+              pure
+                ( if ctx.ctxProfileImages
+                    then
+                      Summary
+                        { sumContentImages = mempty,
+                          sumProfileImages =
+                            let addLink (LinkUrl l) = addImageUrl l
+                             in ( addLink (Api.sitIconUrl obj)
+                                    . addLink (Api.sitHighResolutionIconUrl obj)
+                                    . addLink (Api.sitFaviconUrl obj)
+                                    . addLink (Api.sitLogoUrl obj)
+                                )
+                                  mempty
+                        }
+                    else mempty
+                )
             OtQuestion -> addItemsResp @Api.Question ctx meta Proxy body
             OtRevision -> error "revision must be in api list"
             OtTag -> addItemsResp @Api.Tag ctx meta Proxy body
@@ -358,11 +476,19 @@ addEntry ctx bs =
                         V.concatMap
                           ( \r ->
                               case Aeson.eitherDecodeStrict r.hrResponse.respBody.jsonBody of
-                                Right Api.Wrapper {Api.wItems = is} -> (is :: V.Vector BinJson.BinValue)
+                                Right Api.Wrapper {Api.wItems = is} -> (is :: V.Vector (BinJson.WithBinValue Api.Revision))
                                 Left e -> throw (Aeson.AesonException e)
                           )
                           resp
-                   in addApiItem ctx meta (AsdRevision revId ARevInfo) content
+                   in V.foldl'
+                        (\s (BinJson.WithBinValue _ r) -> addRevisionSummary ctx r s)
+                        mempty
+                        content
+                        <$ addApiItem
+                          ctx
+                          meta
+                          (AsdRevision revId ARevInfo)
+                          (V.map (\(BinJson.WithBinValue bv _) -> bv) content)
               | otherwise -> error "incomplete revision"
             LrQuestion {lrqId = qId, lrqRequest = qReq} ->
               case qReq of
@@ -405,44 +531,68 @@ withObjectStore root serverRoot f =
 
 main :: IO ()
 main = do
-  (storeRoot, serverRoot, fetchPath) <-
-    getArgs >>= \case
-      [sr, fs, fp] -> pure (sr, fs, fp)
-      _ -> error "invalid args"
-  withDataStore
-    storeRoot
-    serverRoot
-    ( \ds ->
-        withObjectStore
-          storeRoot
-          serverRoot
-          ( \os -> do
-              fetchId <- addWiresharkFetch os ds (RtApiRequest RrFetch) fetchPath
-              let context =
-                    Context
-                      { ctxDataStore = ds,
-                        ctxObjectStore = os,
-                        ctxFetchId = fetchId
-                      }
-              C.withSourceFile
-                (fetchPath ++ "/data.tar")
-                ( \i ->
-                    C.runConduit
-                      ( i
-                          .| Tar.untar
-                            ( \fi ->
-                                C.map BSB.byteString .| C.sinkLazyBuilder >>= \ent ->
-                                  liftIO
-                                    ( catch
-                                        (addEntry context ent >> print (Tar.filePath fi))
-                                        ( \(SomeException exn) ->
-                                            hPutStrLn
-                                              stderr
-                                              (show (Tar.filePath fi) ++ ": " ++ displayException exn)
-                                        )
-                                    )
-                            )
-                      )
-                )
-          )
+  args <- execParser (OptParse.info (parser <**> helper) mempty)
+  summary <-
+    withDataStore
+      args.argStoreRoot
+      args.argServerRoot
+      ( \ds ->
+          withObjectStore
+            args.argStoreRoot
+            args.argServerRoot
+            ( \os -> do
+                fetchId <- addWiresharkFetch os ds (RtApiRequest RrFetch) args.argFetchRoot
+                let context =
+                      Context
+                        { ctxDataStore = ds,
+                          ctxObjectStore = os,
+                          ctxFetchId = fetchId,
+                          ctxContentImages = isJust (argContentImages args),
+                          ctxProfileImages = isJust (argProfileImages args)
+                        }
+                C.withSourceFile
+                  (args.argFetchRoot ++ "/data.tar")
+                  ( \i ->
+                      C.runConduit
+                        ( i
+                            .| Tar.untar
+                              ( \fi ->
+                                  C.map BSB.byteString .| C.sinkLazyBuilder >>= \ent ->
+                                    liftIO
+                                      ( catch
+                                          ( do
+                                              s <- addEntry context ent
+                                              let ctx = show (Tar.filePath fi)
+                                              printError ctx (sumContentImages s)
+                                              printError ctx (sumProfileImages s)
+                                              print (Tar.filePath fi)
+                                              pure s
+                                          )
+                                          ( \(SomeException exn) ->
+                                              mempty
+                                                <$ hPutStrLn
+                                                  stderr
+                                                  (show (Tar.filePath fi) ++ ": " ++ displayException exn)
+                                          )
+                                      )
+                                      >>= C.yield
+                              )
+                            .| C.fold
+                        )
+                  )
+            )
+      )
+  writeImageSpec (argContentImages args) (sumContentImages summary)
+  writeImageSpec (argProfileImages args) (sumProfileImages summary)
+  writeUrlSet
+    (argInvalidUrl args)
+    ( M.keysSet
+        ( invalidUrls (sumContentImages summary)
+            <> invalidUrls (sumProfileImages summary)
+        )
+    )
+  writeUrlSet
+    (argUnknownUrl args)
+    ( unknownUrls (sumContentImages summary)
+        <> unknownUrls (sumProfileImages summary)
     )
