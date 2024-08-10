@@ -31,11 +31,19 @@ type RequestMetaId = DigestField RequestMeta
 
 type FetchDataId = DigestField FetchData
 
-data Traffic = TWireshark
-  { twKeyLog :: KeyLogId,
-    twRequestMeta :: RequestMetaId,
-    twData :: WiresharkDataId
-  }
+-- | Fetch traffic
+--
+--  Since fetched data can be regenerated from captured traffic and metadata,
+--  it is recorded only if no traffic is captured
+data Traffic
+  = TWireshark
+      { twKeyLog :: KeyLogId,
+        twRequestMeta :: RequestMetaId,
+        twData :: WiresharkDataId
+      }
+  | -- | Traffic is not captured, so use fetched data to distinguish different
+    -- fetch
+    TNone {tnFetchData :: FetchDataId}
   deriving (Show)
 
 deriveSumData
@@ -49,8 +57,7 @@ data FetchInfo l = FetchInfo
   { tiTimestamp :: Timestamp,
     tiLog :: LogId,
     tiUser :: Maybe l,
-    tiFetchData :: FetchDataId,
-    tiTraffic :: Maybe Traffic
+    tiTraffic :: Traffic
   }
   deriving (Show)
 

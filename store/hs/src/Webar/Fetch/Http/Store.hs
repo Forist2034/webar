@@ -59,21 +59,17 @@ fetchInfo p isWireshark = do
               reqMeta <- hashFile fd "request_meta.tar"
               reqData <- hashFile fd "traffic.pcapng"
               pure
-                ( Just
-                    TWireshark
-                      { twKeyLog = keyLog,
-                        twRequestMeta = reqMeta,
-                        twData = reqData
-                      }
-                )
-            else pure Nothing
-        fetchData <- hashFile fd "data.tar"
+                TWireshark
+                  { twKeyLog = keyLog,
+                    twRequestMeta = reqMeta,
+                    twData = reqData
+                  }
+            else TNone <$> hashFile fd "data.tar"
         pure
           ( FetchInfo
               { tiTimestamp = fmTimestamp meta,
                 tiLog = logFile,
                 tiUser = fmUser meta,
-                tiFetchData = fetchData,
                 tiTraffic = traffic
               }
           )
