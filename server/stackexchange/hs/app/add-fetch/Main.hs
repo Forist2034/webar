@@ -74,9 +74,9 @@ addHttpResponse ctx callSeq respIdx req =
         (OtRecord (RtApiRequest RrHttpRequest))
         1
         HttpInfo
-          { hiUrl = hrUrl req,
+          { hiUrl = req.hrRequest.reqUrl,
             hiFetch = ctxFetchId ctx,
-            hiRequestId = hrRequestId req,
+            hiRequestId = req.hrRequest.reqId,
             hiCallSeq = callSeq,
             hiResponseIndex = fromIntegral respIdx,
             hiResponse = (hrResponse req) {respBody = body.blobId}

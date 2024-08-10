@@ -13,7 +13,7 @@ use webar_stackexchange_core::{
             Answer, ApiObject, Badge, Collective, Comment, Info, Question, Revision, Tag,
             TagSynonym, TagWiki, User, Wrapper,
         },
-        request::{self, ApiObjectType, List, ListRequest, Objects, RequestId, ResponseId},
+        request::{self, ApiObjectType, List, ListRequest, Objects, ResponseId},
     },
     fetcher::api_client::{ApiData, ApiResponse, HttpRequest, ListData, ObjectsData},
     id::{AnswerId, BadgeId, CollectiveSlug, CommentId, QuestionId, RevisionId, TagName, UserId},
@@ -118,9 +118,15 @@ impl<FN> Client<FN> {
             .header(X_REQUEST_ID, request_id.to_string())
             .build()
             .map_err(Error::Http)?;
-        let url = req.url().to_string();
+        let request = request::Request {
+            id: request::RequestId::XRequestId(request_id),
+            method: reqwest::Method::GET.into(),
+            url: req.url().to_string(),
+            timestamp: Timestamp::now(),
+            body: (),
+        };
         tracing::info!(
-            url,
+            url = tracing::field::display(&request.url),
             request_id = tracing::field::display(request_id),
             "sending request"
         );
@@ -158,9 +164,7 @@ impl<FN> Client<FN> {
             parsed: serde_json::from_slice(&body)
                 .map_err(|e| Error::Json(response_id.clone(), e))?,
             response: HttpRequest {
-                method: reqwest::Method::GET.into(),
-                url,
-                request_id: RequestId::XRequestId(request_id),
+                request,
                 response: request::Response {
                     id: response_id,
                     status,

@@ -164,6 +164,21 @@ impl From<http::HeaderMap<http::HeaderValue>> for HeaderMap<HeaderValue> {
     }
 }
 
+/** http request
+
+  Request headers is not included because it is difficult to
+  get full headers and only include partial header is not reproducible.
+  So if request headers is needed, use specific type.
+*/
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Request<I, U, B> {
+    pub id: I,
+    pub method: Method,
+    pub url: U,
+    pub timestamp: Timestamp,
+    pub body: B,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Response<I, H, B> {
     pub id: I,

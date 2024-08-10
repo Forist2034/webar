@@ -4,18 +4,15 @@
 
 module Webar.Server.StackExchange.Fetcher.ApiClient where
 
-import Data.Text (Text)
 import Data.Word (Word32)
 import Webar.Data.Cbor.TH
-import Webar.Http (JsonBody, Method)
+import Webar.Http (JsonBody)
 import Webar.Server.StackExchange.Api.Filter (FilterId)
 import Webar.Server.StackExchange.Api.Request
 import Webar.Server.StackExchange.Api.Types (ApiSiteParameter, ApiVersion)
 
 data HttpRequest = HttpRequest
-  { hrMethod :: Method,
-    hrUrl :: Text,
-    hrRequestId :: RequestId,
+  { hrRequest :: Request,
     hrResponse :: Response JsonBody
   }
   deriving (Show)

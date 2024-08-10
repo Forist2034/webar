@@ -7,6 +7,7 @@ module Webar.Http
     Method,
     HeaderMap,
     JsonBody (..),
+    Request (..),
     Response (..),
   )
 where
@@ -81,6 +82,19 @@ newtype JsonBody = JsonBody {jsonBody :: ByteString}
   deriving (Show, ByteBuffer, FromCbor)
 
 instance BlobData JsonBody
+
+data Request i b = Request
+  { reqId :: i,
+    reqMethod :: Method,
+    reqUrl :: Text,
+    reqTimestamp :: Timestamp,
+    reqBody :: b
+  }
+  deriving (Show)
+
+deriveProdCbor
+  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  ''Request
 
 data Response i b = Response
   { respId :: i,

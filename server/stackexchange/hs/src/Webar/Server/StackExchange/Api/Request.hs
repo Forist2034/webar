@@ -37,6 +37,8 @@ deriveSumData
     }
   ''ResponseId
 
+type Request = H.Request RequestId ()
+
 type Response = H.Response (Maybe ResponseId)
 
 type FetchId = F.FetchId Void

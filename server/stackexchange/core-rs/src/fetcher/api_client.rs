@@ -1,7 +1,7 @@
 use serde::Deserialize;
 
 use webar_core::{
-    http::{HeaderMap, HeaderValue, Method},
+    http::{HeaderMap, HeaderValue},
     Timestamp,
 };
 use webar_data::{bytes::ByteBuf, ser::Serialize};
@@ -9,7 +9,7 @@ use webar_data::{bytes::ByteBuf, ser::Serialize};
 use crate::{
     api::{
         filter::FilterId,
-        request::{List, ListRequest, Objects, RequestId, Response},
+        request::{List, ListRequest, Objects, Request, RequestId, Response},
         ApiVersion,
     },
     KnownSite,
@@ -17,9 +17,7 @@ use crate::{
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct HttpRequest {
-    pub method: Method,
-    pub url: String,
-    pub request_id: RequestId,
+    pub request: Request<String>,
     pub response: Response<HeaderMap<HeaderValue>, ByteBuf>,
 }
 
@@ -32,7 +30,7 @@ impl HttpRequest {
     pub fn to_meta(&self) -> HttpMeta {
         HttpMeta {
             timestamp: self.response.timestamp,
-            request_id: self.request_id.clone(),
+            request_id: self.request.id.clone(),
         }
     }
 }

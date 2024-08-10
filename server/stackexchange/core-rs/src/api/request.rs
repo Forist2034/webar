@@ -148,6 +148,7 @@ pub enum ResponseId {
     XRequestGuid(Uuid),
 }
 
+pub type Request<U> = webar_core::http::Request<RequestId, U, ()>;
 pub type Response<H, B> = webar_core::http::Response<Option<ResponseId>, H, B>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
