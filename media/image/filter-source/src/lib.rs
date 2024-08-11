@@ -35,7 +35,7 @@ fn run<S: ServerConfig>(
     output: &str,
 ) -> Result<()> {
     let index = webar_image_store::object::index::Index::open_ro(
-        Path::new(root).join("store/image/index.db"),
+        Path::new(root).join(webar_image_store::object::index::INDEX_PATH.path),
     )
     .context("failed to open index")?;
 

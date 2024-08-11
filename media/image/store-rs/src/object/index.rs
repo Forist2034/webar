@@ -4,10 +4,21 @@ use rusqlite::{Connection, OpenFlags};
 use webar_core::{
     digest::{Digest, Sha256},
     object::ObjectId,
+    FilePath,
 };
 
 pub struct ReadOnly;
 pub struct ReadWrite;
+
+pub const INDEX_FILE: FilePath = FilePath {
+    path: "object_index.db",
+    c_path: c"object_index.db",
+};
+
+pub const INDEX_PATH: FilePath = FilePath {
+    path: "image/object_index.db",
+    c_path: c"image/object_index.db",
+};
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]

@@ -161,11 +161,15 @@ fn run<'a, S: ServerConfig>(
         fetch_blob: store::blob::store::BaseStore::open_at(fetch_root.as_fd(), c"data")
             .context("failed to open fetch data")?,
         blob_store,
-        blob_index: store::blob::index::Index::create(root_path.join("store/blob/index.db"))
-            .context("failed to open blob index")?,
+        blob_index: store::blob::index::Index::create(
+            root_path.join(store::blob::index::INDEX_PATH.path),
+        )
+        .context("failed to open blob index")?,
         object_store,
-        object_index: store::object::index::Index::create(root_path.join("store/image/index.db"))
-            .context("failed to open image index")?,
+        object_index: store::object::index::Index::create(
+            root_path.join(store::object::index::INDEX_PATH.path),
+        )
+        .context("failed to open image index")?,
     };
 
     let mut data_tar = tar::Archive::new(std::io::BufReader::new(std::fs::File::from(

@@ -5,6 +5,7 @@ use rusqlite::{Connection, OpenFlags};
 use webar_core::{
     blob::BlobId,
     digest::{Digest, Sha256},
+    FilePath,
 };
 
 pub struct ReadOnly;
@@ -13,6 +14,16 @@ pub struct ReadWrite;
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
 pub struct Error(#[from] rusqlite::Error);
+
+pub const INDEX_FILE: FilePath = FilePath {
+    path: "blob_index.db",
+    c_path: c"blob_index.db",
+};
+
+pub const INDEX_PATH: FilePath = FilePath {
+    path: "image/blob_index.db",
+    c_path: c"image/blob_index.db",
+};
 
 pub struct Index<S> {
     conn: Connection,
