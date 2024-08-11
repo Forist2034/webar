@@ -5,7 +5,7 @@ use webar_data::ser::Serialize;
 
 use super::source;
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct ImageSpec<I> {
     pub id: I,
     pub preferred_url: String,

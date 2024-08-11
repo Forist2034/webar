@@ -19,9 +19,9 @@ pub enum RecordType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ArchiveInfo {
+pub enum ArchiveInfo<S> {
     #[serde(rename = "image")]
-    Image(image::source::ArchiveImage),
+    Image(image::source::ArchiveImage<S>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

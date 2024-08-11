@@ -1,0 +1,17 @@
+[package]
+name = "webar-image-filter-source"
+version = "0.1.0"
+edition = "2021"
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde.workspace = true
+ciborium.workspace = true
+anyhow.workspace = true
+
+webar-data.workspace = true
+webar-core.workspace = true
+webar-media-core.workspace = true
+webar-image-store.workspace = true

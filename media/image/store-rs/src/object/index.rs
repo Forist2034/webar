@@ -32,7 +32,7 @@ impl<S> Index<S> {
     pub fn url_exists(&self, url: &str) -> Result<bool, Error> {
         self.conn
             .prepare_cached("select * from url where url = ?")?
-            .exists((0, url))
+            .exists([url])
             .map_err(Error)
     }
     pub fn object_exists<T>(&self, id: &ObjectId<T>) -> Result<bool, Error> {
