@@ -5,13 +5,14 @@ use std::{
 };
 
 use rustix::{
-    fd::{AsFd, OwnedFd},
+    fd::{AsFd, BorrowedFd, OwnedFd},
     fs::{self, AtFlags, OFlags},
     io::Errno,
+    path::Arg,
 };
 use webar_core::{
     digest::{Digest, Sha256},
-    object::{self, ObjectId, ObjectInfo, Server},
+    object::{self, ObjectId, ObjectInfo, ObjectType, Server},
 };
 use webar_data::ser::Serialize;
 
@@ -48,6 +49,9 @@ impl BaseStore {
     pub fn open(path: &Path) -> Result<Self, Errno> {
         fs::open(path, OFlags::PATH | OFlags::DIRECTORY, perm::IGNORE).map(Self)
     }
+    pub fn open_at(dir: BorrowedFd, path: impl Arg) -> Result<Self, Errno> {
+        fs::openat(dir, path, OFlags::PATH | OFlags::DIRECTORY, perm::IGNORE).map(Self)
+    }
     pub fn add_object<N, Host, Archive, Snapshot, Record, Data>(
         &self,
         server: &Server<N>,
@@ -83,5 +87,54 @@ impl BaseStore {
     }
     pub fn link<T>(&self, old: &Self, id: &ObjectId<T>) -> Result<(), Errno> {
         self.link_path(old, &to_path(&id.0))
+    }
+}
+
+pub struct WebsiteStore<'a, Host, Archive, Snapshot, Record> {
+    server: Server<&'static str>,
+    host: Host,
+    pub base: &'a BaseStore,
+    upper: BaseStore,
+    _phantom: PhantomData<fn(Archive, Snapshot, Record)>,
+}
+impl<'a, Host, Archive, Snapshot, Record> WebsiteStore<'a, Host, Archive, Snapshot, Record>
+where
+    Host: Serialize + Copy,
+    Archive: Serialize,
+    Snapshot: Serialize,
+    Record: Serialize,
+{
+    pub fn open_at(
+        server: Server<&'static str>,
+        host: Host,
+        base: &'a BaseStore,
+        dir: BorrowedFd,
+        path: impl Arg,
+    ) -> Result<Self, Errno> {
+        Ok(Self {
+            server,
+            host,
+            base,
+            upper: BaseStore::open_at(dir, path)?,
+            _phantom: PhantomData,
+        })
+    }
+    pub fn add_object<T: Serialize>(
+        &self,
+        ty: ObjectType<Archive, Snapshot, Record>,
+        version: u8,
+        data: &T,
+    ) -> Result<ObjectHandle<T>, Errno> {
+        let ret = self.base.add_object(
+            &self.server,
+            &ObjectInfo {
+                host: self.host,
+                ty,
+                version,
+            },
+            data,
+        )?;
+        self.upper.link_handle(self.base, &ret)?;
+        Ok(ret)
     }
 }

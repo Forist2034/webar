@@ -95,3 +95,5 @@ pub mod fetcher {
 pub mod image {
     pub mod source;
 }
+
+pub mod source;

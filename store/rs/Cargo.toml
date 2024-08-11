@@ -7,7 +7,12 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde.workspace = true
+ciborium.workspace = true
+sha2.workspace = true
 const-hex.workspace = true
 rustix.workspace = true
+thiserror.workspace = true
+
 webar-data.workspace = true
 webar-core.workspace = true

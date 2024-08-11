@@ -17,4 +17,8 @@ mod perm {
 pub mod blob;
 pub mod object;
 
+pub mod fetch {
+    pub mod http;
+}
+
 mod utils;

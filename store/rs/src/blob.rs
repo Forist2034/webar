@@ -77,3 +77,27 @@ impl BaseStore {
         Ok(())
     }
 }
+
+pub struct WebsiteStore<'a> {
+    pub base: &'a BaseStore,
+    upper: BaseStore,
+}
+impl<'a> WebsiteStore<'a> {
+    pub fn open_at(base: &'a BaseStore, dirfd: BorrowedFd, path: impl Arg) -> Result<Self, Errno> {
+        Ok(Self {
+            base,
+            upper: BaseStore::open_at(dirfd, path)?,
+        })
+    }
+    pub fn add_blob<B: BlobData>(&self, data: &B) -> Result<BlobHandle<B>, Errno> {
+        let ret = self.base.add_blob(data)?;
+        self.upper.link_handle(&self.base, &ret)?;
+        Ok(ret)
+    }
+    pub fn link<B: BlobData>(&self, old: &BaseStore, id: &BlobId<B>) -> Result<(), Errno> {
+        let path = to_path(is_image::<B>(), &id.0);
+        self.base.link_path(old, &path)?;
+        // base store may already have blob, so always link to base store
+        self.upper.link_path(self.base, &path)
+    }
+}

@@ -111,7 +111,7 @@ pub enum ObjectType<Archive, Snapshot, Record> {
 ))]
 pub struct ObjectInfo<Host, Archive, Snapshot, Record> {
     pub host: Host,
-    #[serde(rename = "ty")]
+    #[serde(rename = "type")]
     pub ty: ObjectType<Archive, Snapshot, Record>,
     pub version: u8,
 }

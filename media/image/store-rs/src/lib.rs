@@ -1,3 +1,5 @@
+pub use webar_store::fetch;
+
 pub mod blob {
     pub mod index;
     pub use webar_store::blob as store;

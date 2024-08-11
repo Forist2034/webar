@@ -7,3 +7,5 @@ pub enum ArchiveImage {
     #[serde(rename = "content")]
     Content(String),
 }
+
+pub use webar_media_core::image::source::*;

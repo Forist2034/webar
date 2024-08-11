@@ -20,7 +20,10 @@ pub struct Index<S> {
 impl Index<ReadOnly> {
     pub fn open_ro(path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            conn: Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?,
+            conn: Connection::open_with_flags(
+                path,
+                OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )?,
             _state: PhantomData,
         })
     }
@@ -28,34 +31,34 @@ impl Index<ReadOnly> {
 impl<S> Index<S> {
     pub fn url_exists(&self, url: &str) -> Result<bool, Error> {
         self.conn
-            .prepare_cached("select exists(*) from url where url = ?")?
-            .exists((1, url))
+            .prepare_cached("select * from url where url = ?")?
+            .exists((0, url))
             .map_err(Error)
     }
     pub fn object_exists<T>(&self, id: &ObjectId<T>) -> Result<bool, Error> {
         self.conn
-            .prepare_cached("select exists(*) from object_sha256 where sha256 = ?")?
-            .exists((
-                1,
-                match &id.0 {
-                    Digest::Sha256(Sha256(d)) => d,
-                },
-            ))
+            .prepare_cached("select * from object_sha256 where sha256 = ?")?
+            .exists([match &id.0 {
+                Digest::Sha256(Sha256(d)) => d,
+            }])
             .map_err(Error)
     }
 }
 impl Index<ReadWrite> {
     pub fn open_rw(path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            conn: Connection::open(path)?,
+            conn: Connection::open_with_flags(
+                path,
+                OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )?,
             _state: PhantomData,
         })
     }
     pub fn create(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_CREATE)?;
+        let conn = Connection::open(path)?;
         conn.execute_batch(concat!(
             "create table if not exists object_sha256(sha256 blob primary key) strict;",
-            "create table if not exists url(url: text primary key) strict;"
+            "create table if not exists url(url text primary key) strict;"
         ))?;
         Ok(Self {
             conn,
@@ -65,18 +68,15 @@ impl Index<ReadWrite> {
     pub fn insert_url(&self, url: &str) -> Result<(), Error> {
         self.conn
             .prepare_cached("insert or ignore into url (url) values (?1)")?
-            .insert((1, url))?;
+            .execute([url])?;
         Ok(())
     }
     pub fn insert_object<T>(&self, id: &ObjectId<T>) -> Result<(), Error> {
         self.conn
             .prepare_cached("insert or ignore into object_sha256 (sha256) values (?1)")?
-            .insert((
-                1,
-                match &id.0 {
-                    Digest::Sha256(Sha256(d)) => d,
-                },
-            ))?;
+            .execute([match &id.0 {
+                Digest::Sha256(Sha256(d)) => d,
+            }])?;
         Ok(())
     }
 }

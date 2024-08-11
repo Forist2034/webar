@@ -10,10 +10,12 @@ members = [
   "./media/core-rs",
   "./media/image/store-rs",
   "./media/image/fetcher",
+  "media/image/add-fetch",
   "./server/stackexchange/core-rs",
   "./server/stackexchange/create-filter",
   "./server/stackexchange/fetcher",
   "server/stackexchange/image-fetcher",
+  "server/stackexchange/add-image",
 ]
 
 
@@ -53,5 +55,6 @@ webar-store = { path = "./store/rs" }
 webar-media-core = { path = "./media/core-rs" }
 webar-image-store = { path = "./media/image/store-rs" }
 webar-image-fetcher = { path = "./media/image/fetcher" }
+webar-image-add-fetch = { path = "media/image/add-fetch" }
 webar-stackexchange-core = { path = "./server/stackexchange/core-rs" }
 webar-stackexchange-fetcher = { path = "./server/stackexchange/fetcher" }

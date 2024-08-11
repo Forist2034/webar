@@ -1,5 +1,5 @@
 [package]
-name = "webar-stackexchange-core"
+name = "webar-image-add-fetch"
 version = "0.1.0"
 edition = "2021"
 license.workspace = true
@@ -8,10 +8,12 @@ license.workspace = true
 
 [dependencies]
 serde.workspace = true
-serde_json.workspace = true
-uuid.workspace = true
-phf.workspace = true
+ciborium.workspace = true
+tar.workspace = true
+anyhow.workspace = true
+rustix.workspace = true
 
-webar-core.workspace = true
 webar-data.workspace = true
+webar-core.workspace = true
 webar-media-core.workspace = true
+webar-image-store.workspace = true

@@ -21,7 +21,10 @@ pub struct Index<S> {
 impl Index<ReadOnly> {
     pub fn open_ro(path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            conn: Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?,
+            conn: Connection::open_with_flags(
+                path,
+                OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )?,
             _state: PhantomData,
         })
     }
@@ -29,25 +32,25 @@ impl Index<ReadOnly> {
 impl<S> Index<S> {
     pub fn exists<T>(&self, id: &BlobId<T>) -> Result<bool, Error> {
         self.conn
-            .prepare_cached("select exists(*) from sha256 where sha256 = ?")?
-            .exists((
-                1,
-                match &id.0 {
-                    Digest::Sha256(Sha256(d)) => d,
-                },
-            ))
+            .prepare_cached("select * from sha256 where sha256 = ?")?
+            .exists([match &id.0 {
+                Digest::Sha256(Sha256(d)) => d,
+            }])
             .map_err(Error)
     }
 }
 impl Index<ReadWrite> {
     pub fn open_rw(path: impl AsRef<Path>) -> Result<Self, Error> {
         Ok(Self {
-            conn: Connection::open(path)?,
+            conn: Connection::open_with_flags(
+                path,
+                OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )?,
             _state: PhantomData,
         })
     }
     pub fn create(path: impl AsRef<Path>) -> Result<Self, Error> {
-        let conn = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_CREATE)?;
+        let conn = Connection::open(path)?;
         conn.execute(
             "create table if not exists sha256 (sha256 blob primary key) strict",
             (),
@@ -60,12 +63,9 @@ impl Index<ReadWrite> {
     pub fn insert<T>(&self, id: &BlobId<T>) -> Result<(), Error> {
         self.conn
             .prepare_cached("insert or ignore into sha256 (sha256) values (?)")?
-            .insert((
-                1,
-                match &id.0 {
-                    Digest::Sha256(Sha256(d)) => d,
-                },
-            ))?;
+            .execute([match &id.0 {
+                Digest::Sha256(Sha256(d)) => d,
+            }])?;
         Ok(())
     }
 }
