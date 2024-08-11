@@ -16,7 +16,7 @@ members = [
   "./server/stackexchange/create-filter",
   "./server/stackexchange/fetcher",
   "server/stackexchange/image-fetcher",
-  "server/stackexchange/add-image",
+  "server/stackexchange/add-image-fetch",
   "server/stackexchange/filter-image-src",
 ]
 
