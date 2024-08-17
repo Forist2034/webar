@@ -14,14 +14,14 @@ import qualified Webar.Store.Object.Base as OS
 
 data ObjectStore h a st rt = ObjectStore
   { storeServer :: !Server,
-    storeHost :: !h,
+    storeInstance :: !h,
     baseStore :: !OS.ObjectStore,
     upperStore :: !OS.ObjectStore
   }
 
 openByFilePath :: Server -> h -> OS.ObjectStore -> FilePath -> IO (ObjectStore h a st rt)
-openByFilePath server host base fp =
-  ObjectStore server host base <$> OS.openByFilePath fp
+openByFilePath server inst base fp =
+  ObjectStore server inst base <$> OS.openByFilePath fp
 
 addObject ::
   (ToCbor h, ToCbor st, ToCbor rt, ToCbor o) =>
@@ -35,7 +35,7 @@ addObject s ot ver o =
     (baseStore s)
     (storeServer s)
     ObjectInfo
-      { oiHost = storeHost s,
+      { oiInstance = storeInstance s,
         oiType = ot,
         oiVersion = ver
       }

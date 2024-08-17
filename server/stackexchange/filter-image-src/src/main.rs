@@ -17,7 +17,7 @@ impl ServerConfig for ServerCfg {
     const SERVER: webar_core::object::Server<&'static str> = source::SERVER;
 
     type ImageId = image::source::ArchiveImage<String>;
-    type Host = source::Host;
+    type Instance = source::Instance;
     type Archive<'a> = source::ArchiveInfo<&'a str>;
 
     fn to_archive<'a>(id: &'a Self::ImageId) -> Self::Archive<'a> {

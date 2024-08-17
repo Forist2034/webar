@@ -9,7 +9,7 @@
 --
 --  [@server@]: e.g. wordpress
 --
---  [@host@]: e.g. example.wordpress.com
+--  [@instance@]: e.g. example.wordpress.com
 --
 --  [@archive@]: e.g. post
 --
@@ -70,7 +70,7 @@ deriveSumData
   ''ObjectType
 
 data ObjectInfo h archive st rt = ObjectInfo
-  { oiHost :: h,
+  { oiInstance :: h,
     oiType :: ObjectType archive st rt,
     oiVersion :: Word8
   }

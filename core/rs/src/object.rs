@@ -106,23 +106,23 @@ pub enum ObjectType<Archive, Snapshot, Record> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(bound(
-    serialize = "Host:Serialize, Snapshot:Serialize, Record:Serialize",
-    deserialize = "Host:Deserialize<'de>, Snapshot:Deserialize<'de>, Record:Deserialize<'de>"
+    serialize = "Inst:Serialize, Snapshot:Serialize, Record:Serialize",
+    deserialize = "Inst:Deserialize<'de>, Snapshot:Deserialize<'de>, Record:Deserialize<'de>"
 ))]
-pub struct ObjectInfo<Host, Archive, Snapshot, Record> {
-    pub host: Host,
+pub struct ObjectInfo<Inst, Archive, Snapshot, Record> {
+    pub instance: Inst,
     #[serde(rename = "type")]
     pub ty: ObjectType<Archive, Snapshot, Record>,
     pub version: u8,
 }
 
-pub fn encode_object<N: AsRef<str>, Host, Archive, Snapshot, Record, D>(
+pub fn encode_object<N: AsRef<str>, Inst, Archive, Snapshot, Record, D>(
     server: &Server<N>,
-    info: &ObjectInfo<Host, Archive, Snapshot, Record>,
+    info: &ObjectInfo<Inst, Archive, Snapshot, Record>,
     data: &D,
 ) -> Vec<u8>
 where
-    Host: Serialize,
+    Inst: Serialize,
     Archive: Serialize,
     Snapshot: Serialize,
     Record: Serialize,

@@ -14,7 +14,7 @@ pub trait ServerConfig {
     const SERVER: Server<&'static str>;
     type ImageId: Serialize + DeserializeOwned;
 
-    type Host: Serialize + Copy;
+    type Instance: Serialize + Copy;
     type Archive<'a>: Serialize;
 
     fn to_archive<'a>(id: &'a Self::ImageId) -> Self::Archive<'a>;
@@ -29,7 +29,7 @@ pub struct Config {
 
 fn run<S: ServerConfig>(
     config: Config,
-    host: S::Host,
+    instance: S::Instance,
     root: &str,
     input: &str,
     output: &str,
@@ -50,7 +50,7 @@ fn run<S: ServerConfig>(
                 Digest::digest(&encode_object(
                     &S::SERVER,
                     &ObjectInfo {
-                        host,
+                        instance,
                         ty: webar_core::object::ObjectType::Archive::<S::Archive<'_>, Never, Never>,
                         version: 1,
                     },
@@ -102,12 +102,12 @@ fn run<S: ServerConfig>(
 
 pub fn main<S: ServerConfig>(
     config: Config,
-    host: S::Host,
+    instance: S::Instance,
     root: &str,
     input: &str,
     output: &str,
 ) -> ExitCode {
-    match run::<S>(config, host, root, input, output) {
+    match run::<S>(config, instance, root, input, output) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e:?}");

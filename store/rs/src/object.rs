@@ -90,30 +90,30 @@ impl BaseStore {
     }
 }
 
-pub struct WebsiteStore<'a, Host, Archive, Snapshot, Record> {
+pub struct WebsiteStore<'a, Inst, Archive, Snapshot, Record> {
     server: Server<&'static str>,
-    host: Host,
+    instance: Inst,
     pub base: &'a BaseStore,
     upper: BaseStore,
     _phantom: PhantomData<fn(Archive, Snapshot, Record)>,
 }
-impl<'a, Host, Archive, Snapshot, Record> WebsiteStore<'a, Host, Archive, Snapshot, Record>
+impl<'a, Inst, Archive, Snapshot, Record> WebsiteStore<'a, Inst, Archive, Snapshot, Record>
 where
-    Host: Serialize + Copy,
+    Inst: Serialize + Copy,
     Archive: Serialize,
     Snapshot: Serialize,
     Record: Serialize,
 {
     pub fn open_at(
         server: Server<&'static str>,
-        host: Host,
+        instance: Inst,
         base: &'a BaseStore,
         dir: BorrowedFd,
         path: impl Arg,
     ) -> Result<Self, Errno> {
         Ok(Self {
             server,
-            host,
+            instance,
             base,
             upper: BaseStore::open_at(dir, path)?,
             _phantom: PhantomData,
@@ -128,7 +128,7 @@ where
         let ret = self.base.add_object(
             &self.server,
             &ObjectInfo {
-                host: self.host,
+                instance: self.instance,
                 ty,
                 version,
             },

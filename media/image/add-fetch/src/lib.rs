@@ -20,7 +20,7 @@ pub trait ServerConfig {
     const SERVER: Server<&'static str>;
 
     type ImageId: Serialize + DeserializeOwned;
-    type Host: Serialize + Copy;
+    type Instance: Serialize + Copy;
     type Archive: Debug + Serialize;
     type Snapshot: Serialize;
     type Record: Serialize;
@@ -36,7 +36,7 @@ struct Context<'a, S: ServerConfig> {
     blob_store: store::blob::store::WebsiteStore<'a>,
     blob_index: store::blob::index::Index<store::blob::index::ReadWrite>,
     object_store:
-        store::object::store::WebsiteStore<'a, S::Host, S::Archive, S::Snapshot, S::Record>,
+        store::object::store::WebsiteStore<'a, S::Instance, S::Archive, S::Snapshot, S::Record>,
     object_index: store::object::index::Index<store::object::index::ReadWrite>,
 }
 
@@ -124,7 +124,7 @@ fn add_image<'a, S: ServerConfig>(ctx: &Context<'a, S>, seq: usize, data: &[u8])
 }
 
 fn run<'a, S: ServerConfig>(
-    host: S::Host,
+    instance: S::Instance,
     root_path: &Path,
     server_path: &str,
     fetch_root: &str,
@@ -144,7 +144,7 @@ fn run<'a, S: ServerConfig>(
             .context("failed to open website blob store")?;
     let object_store = store::object::store::WebsiteStore::open_at(
         S::SERVER,
-        host,
+        instance,
         &object_base,
         server_root.as_fd(),
         c"store/object",
@@ -197,12 +197,12 @@ fn run<'a, S: ServerConfig>(
 }
 
 pub fn main<S: ServerConfig>(
-    host: S::Host,
+    instance: S::Instance,
     root: &str,
     server_root: &str,
     fetch_root: &str,
 ) -> ExitCode {
-    match run::<S>(host, root.as_ref(), server_root, fetch_root) {
+    match run::<S>(instance, root.as_ref(), server_root, fetch_root) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e:?}");

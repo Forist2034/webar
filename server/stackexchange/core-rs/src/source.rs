@@ -10,7 +10,7 @@ pub const SERVER: Server<&'static str> = Server {
     version: 1,
 };
 
-pub type Host = ();
+pub type Instance = ();
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RecordType {

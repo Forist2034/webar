@@ -18,7 +18,7 @@ impl ServerConfig for ServerCfg {
     const SERVER: Server<&'static str> = source::SERVER;
 
     type ImageId = webar_stackexchange_core::image::source::ArchiveImage<String>;
-    type Host = source::Host;
+    type Instance = source::Instance;
     type Archive = source::ArchiveInfo<String>;
     type Snapshot = source::SnapshotType;
     type Record = source::RecordType;
