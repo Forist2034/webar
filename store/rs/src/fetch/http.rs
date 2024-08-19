@@ -1,22 +1,30 @@
-use std::{ffi::CStr, io::Read, marker::PhantomData};
+use std::{
+    ffi::CStr,
+    fmt::Debug,
+    io::{Read, Seek},
+    marker::PhantomData,
+};
 
 use rustix::{
     fd::BorrowedFd,
-    fs::{self, OFlags},
+    fs::{self, openat, OFlags},
 };
 
+use serde::de::DeserializeOwned;
 use webar_core::{
     digest::{Digest, Sha256},
-    fetch::http::{
-        internal::DigestField, FetchId, FetchInfo, FetchMeta, Traffic, DATA_FILE, KEY_LOG_FILE,
-        LOG_FILE, META_FILE, REQUEST_META_FILE, WIRESHARK_DATA_FILE,
+    fetch::{
+        http::{
+            internal::DigestField, FetchInfo, Metadata, Traffic, TrafficType, DATA_FILE,
+            KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE, WIRESHARK_DATA_FILE,
+        },
+        FetchMeta, META_FILE,
     },
 };
-use webar_data::ser::Serialize;
 
-use crate::{blob, object, perm};
+use crate::{blob, perm};
 
-fn hash_file<F>(root: BorrowedFd, file: &CStr) -> Result<DigestField<F>, std::io::Error> {
+fn hash_std_file<F>(file: &mut std::fs::File) -> Result<DigestField<F>, std::io::Error> {
     struct HashWriter(sha2::Sha256);
     impl std::io::Write for HashWriter {
         fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
@@ -33,14 +41,20 @@ fn hash_file<F>(root: BorrowedFd, file: &CStr) -> Result<DigestField<F>, std::io
     }
 
     let mut writer = HashWriter(sha2::Digest::new());
-    std::io::copy(
-        &mut std::fs::File::from(fs::openat(root, file, OFlags::RDONLY, perm::IGNORE)?),
-        &mut writer,
-    )?;
+    std::io::copy(file, &mut writer)?;
     Ok(DigestField(
         Digest::Sha256(Sha256(sha2::Digest::finalize(writer.0).into())),
         PhantomData,
     ))
+}
+
+fn hash_file<F>(root: BorrowedFd, file: &CStr) -> Result<DigestField<F>, std::io::Error> {
+    hash_std_file(&mut std::fs::File::from(fs::openat(
+        root,
+        file,
+        OFlags::RDONLY,
+        perm::IGNORE,
+    )?))
 }
 
 fn read_file(root: BorrowedFd, file: &CStr) -> Result<Vec<u8>, std::io::Error> {
@@ -51,7 +65,7 @@ fn read_file(root: BorrowedFd, file: &CStr) -> Result<Vec<u8>, std::io::Error> {
 }
 
 #[derive(Debug, thiserror::Error)]
-enum InnerError {
+enum InnerError<T> {
     #[error("io error")]
     Io(
         #[source]
@@ -60,62 +74,85 @@ enum InnerError {
     ),
     #[error("failed to decode metadata")]
     Decode(#[source] ciborium::de::Error<std::io::Error>),
+    #[error("unexpected server name {0:?}")]
+    ServerMismatch(String),
+    #[error("unsupported version {0}")]
+    UnsupportedVersion(u8),
+    #[error("incorrect type {0:?}")]
+    IncorrectType(T),
 }
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
-pub struct Error(InnerError);
+pub struct Error<T>(InnerError<T>);
 
-fn add_fetch<L, H, A, S, R>(
-    is_wireshark: bool,
-    obj_store: &object::WebsiteStore<H, A, S, R>,
+pub struct Fetch<I, L> {
+    pub instance: I,
+    pub info: FetchInfo<L>,
+    pub data: std::fs::File,
+}
+
+fn read_fetch_inner<T, I, L>(
+    server: &'static str,
     root: BorrowedFd,
-    ty: R,
-) -> Result<FetchId<L>, InnerError>
+    ty: T,
+) -> Result<Fetch<I, L>, InnerError<T>>
 where
-    L: Serialize + serde::de::DeserializeOwned,
-    H: Serialize + Copy,
-    A: Serialize,
-    S: Serialize,
-    R: Serialize,
+    L: DeserializeOwned,
+    I: DeserializeOwned,
+    T: Debug + Eq + DeserializeOwned,
 {
-    let meta: FetchMeta<L> = ciborium::from_reader(read_file(root, META_FILE.c_path)?.as_slice())
-        .map_err(InnerError::Decode)?;
-    let traffic = if is_wireshark {
-        Traffic::Wireshark {
+    let fetch_meta: FetchMeta<String, I, T, Metadata<L>> =
+        ciborium::from_reader(read_file(root, META_FILE.c_path)?.as_slice())
+            .map_err(InnerError::Decode)?;
+    if fetch_meta.server != server {
+        return Err(InnerError::ServerMismatch(fetch_meta.server));
+    }
+    if fetch_meta.ty != ty {
+        return Err(InnerError::IncorrectType(fetch_meta.ty));
+    }
+    if fetch_meta.version != 1 {
+        return Err(InnerError::UnsupportedVersion(fetch_meta.version));
+    }
+    let meta = fetch_meta.data;
+
+    let mut data = std::fs::File::from(
+        openat(root, DATA_FILE.c_path, OFlags::RDONLY, perm::IGNORE)
+            .map_err(|e| InnerError::Io(e.into()))?,
+    );
+    let traffic = match meta.traffic {
+        Some(TrafficType::Wireshark) => Traffic::Wireshark {
             key_log: hash_file(root, KEY_LOG_FILE.c_path)?,
             request_meta: hash_file(root, REQUEST_META_FILE.c_path)?,
             data: hash_file(root, WIRESHARK_DATA_FILE.c_path)?,
-        }
-    } else {
-        Traffic::None {
-            fetch_data: hash_file(root, DATA_FILE.c_path)?,
+        },
+        None => {
+            let fetch_data = hash_std_file(&mut data)?;
+            data.rewind()?;
+            Traffic::None { fetch_data }
         }
     };
-    let fetch_info = FetchInfo {
-        timestamp: meta.timestamp,
-        log: hash_file(root, LOG_FILE.c_path)?,
-        user: meta.user,
-        traffic,
-    };
-    Ok(obj_store
-        .add_object(webar_core::object::ObjectType::Record(ty), 1, &fetch_info)
-        .map_err(|e| InnerError::Io(e.into()))?
-        .id)
+    Ok(Fetch {
+        instance: fetch_meta.instance,
+        info: FetchInfo {
+            start_time: meta.start_time,
+            end_time: meta.end_time,
+            log: hash_file(root, LOG_FILE.c_path)?,
+            user: meta.user,
+            traffic,
+        },
+        data,
+    })
 }
 
-pub fn add_fetch_no_traffic<L, H, A, S, R>(
+pub fn read_fetch<T, I: DeserializeOwned, L: DeserializeOwned>(
+    server: &'static str,
     root: BorrowedFd,
-    obj_store: &object::WebsiteStore<H, A, S, R>,
+    ty: T,
     _: &blob::WebsiteStore,
-    ty: R,
-) -> Result<FetchId<L>, Error>
+) -> Result<Fetch<I, L>, Error<T>>
 where
-    L: Serialize + serde::de::DeserializeOwned,
-    H: Serialize + Copy,
-    A: Serialize,
-    S: Serialize,
-    R: Serialize,
+    T: Debug + Eq + DeserializeOwned,
 {
-    add_fetch(false, obj_store, root, ty).map_err(Error)
+    read_fetch_inner(server, root, ty).map_err(Error)
 }

@@ -11,6 +11,8 @@ module Webar.Fetch.Http
     FetchDataId,
     idToDigest,
     Traffic (..),
+    TrafficType (..),
+    Metadata (..),
     FetchInfo (..),
     FetchId,
   )
@@ -53,10 +55,31 @@ deriveSumData
     }
   ''Traffic
 
+data TrafficType = TtWireshark
+  deriving (Show)
+
+deriveSumData
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
+    }
+  ''TrafficType
+
+data Metadata l = Metadata
+  { metaTraffic :: Maybe TrafficType,
+    metaStartTime :: Timestamp,
+    metaEndTime :: Timestamp,
+    metaUser :: l
+  }
+
+deriveProdData
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
+  ''Metadata
+
 data FetchInfo l = FetchInfo
-  { tiTimestamp :: Timestamp,
+  { tiStartTime :: Timestamp,
+    tiEndTime :: Timestamp,
     tiLog :: LogId,
-    tiUser :: Maybe l,
+    tiUser :: l,
     tiTraffic :: Traffic
   }
   deriving (Show)

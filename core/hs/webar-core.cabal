@@ -15,6 +15,7 @@ library
         Webar.Digest
         Webar.Types
         Webar.Http
+        Webar.Fetch
         Webar.Fetch.Http
         Webar.Fetch.Http.Internal
         Webar.Bytes

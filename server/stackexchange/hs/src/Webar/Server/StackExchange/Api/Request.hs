@@ -5,7 +5,6 @@ module Webar.Server.StackExchange.Api.Request where
 import Data.Text (Text)
 import Data.UUID.Types (UUID)
 import Data.Vector (Vector)
-import Data.Void (Void)
 import Data.Word (Word32)
 import Webar.Blob (BlobId)
 import Webar.Data.Cbor.TH
@@ -39,7 +38,7 @@ type Request = H.Request RequestId ()
 
 type Response = H.Response (Maybe ResponseId)
 
-type FetchId = F.FetchId Void
+type FetchId = F.FetchId ()
 
 data HttpInfo = HttpInfo
   { hiUrl :: Text,

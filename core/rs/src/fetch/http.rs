@@ -85,28 +85,28 @@ pub enum Traffic {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FetchInfo<L> {
-    pub timestamp: Timestamp,
+    pub start_time: Timestamp,
+    pub end_time: Timestamp,
     pub log: LogId,
-    pub user: Option<L>,
+    pub user: L,
     pub traffic: Traffic,
 }
 
 pub type FetchId<L> = ObjectId<FetchInfo<L>>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FetchMeta<L> {
-    pub timestamp: Timestamp,
-    pub user: Option<L>,
+pub enum TrafficType {
+    #[serde(rename = "wireshark")]
+    Wireshark,
 }
-pub const META_FILE: FilePath = FilePath {
-    path: "meta.json",
-    c_path: c"meta.json",
-};
 
-pub const INFO_FILE: FilePath = FilePath {
-    path: "info.bin",
-    c_path: c"info.bin",
-};
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Metadata<L> {
+    pub traffic: Option<TrafficType>,
+    pub start_time: Timestamp,
+    pub end_time: Timestamp,
+    pub user: L,
+}
 
 pub const LOG_FILE: FilePath = FilePath {
     path: "log.bin",

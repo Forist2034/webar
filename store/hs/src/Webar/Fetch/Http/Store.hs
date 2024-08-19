@@ -1,41 +1,36 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 
 module Webar.Fetch.Http.Store
-  ( addWiresharkFetch,
-    addFetchNoTraffic,
+  ( Fetch (..),
+    withFetch,
   )
 where
 
-import Control.Exception (bracket)
+import Control.Exception (Exception, bracket, throwIO)
+import Control.Monad (unless)
 import qualified Data.ByteString as BS
+import Data.Data (Typeable)
+import Data.Text (Text)
+import Data.Word (Word8)
 import System.FilePath ((</>))
-import System.IO (hClose)
+import System.IO
 import qualified System.Posix as P.FilePath
 import qualified System.Posix.ByteString as P
-import Webar.Data.Cbor (ToCbor)
 import Webar.Data.Json (FromJSON)
 import qualified Webar.Data.Json as Json
-import Webar.Data.Json.TH
 import Webar.Digest (hashHandle)
+import Webar.Fetch
 import Webar.Fetch.Http
 import Webar.Fetch.Http.Internal
-import Webar.Object
 import qualified Webar.Store.Blob.WithShared as BS
-import qualified Webar.Store.Object.Website as OS
-import Webar.Types (Timestamp)
 
-data FetchMeta l = FetchMeta
-  { fmTimestamp :: Timestamp,
-    fmUser :: Maybe l
+data Fetch i l = Fetch
+  { fInstance :: i,
+    fInfo :: FetchInfo l,
+    fData :: Handle
   }
-  deriving (Show)
-
-deriveProdFromJSON
-  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
-  ''FetchMeta
 
 hashFile :: P.Fd -> P.RawFilePath -> IO (DigestField t)
 hashFile dirFd p =
@@ -44,62 +39,71 @@ hashFile dirFd p =
     hClose
     (fmap DigestField . hashHandle)
 
-fetchInfo :: (FromJSON l) => FilePath -> Bool -> IO (FetchInfo l)
-fetchInfo p isWireshark = do
-  meta <- Json.decodeStrictBsThrow <$> BS.readFile (p </> "meta.json")
+data MetaException t
+  = ServerMismatch Text
+  | UnsupportedVersion Word8
+  | IncorrectType t
+  deriving (Show)
+
+instance (Show t, Typeable t) => Exception (MetaException t)
+
+readFetch ::
+  forall i t l.
+  (FromJSON i, FromJSON t, Show t, Eq t, Typeable t, FromJSON l) =>
+  Text ->
+  t ->
+  FilePath ->
+  IO (Fetch i l)
+readFetch server ty p = do
+  fetchMeta <- Json.decodeStrictBsThrow <$> BS.readFile (p </> "meta.json")
+  unless (fmServer fetchMeta == server) (throwIO (ServerMismatch @t (fmServer fetchMeta)))
+  unless (fmType fetchMeta == ty) (throwIO (IncorrectType (fmType fetchMeta)))
+  unless (fmVersion fetchMeta == 1) (throwIO (UnsupportedVersion @t (fmVersion fetchMeta)))
+  let meta = fmData fetchMeta
   bracket
     (P.FilePath.openFd p P.FilePath.ReadOnly P.FilePath.defaultFileFlags)
     P.FilePath.closeFd
     ( \fd -> do
         logFile <- hashFile fd "log.bin"
-        traffic <-
-          if isWireshark
-            then do
-              keyLog <- hashFile fd "sslkeylog.keys"
-              reqMeta <- hashFile fd "request_meta.tar"
-              reqData <- hashFile fd "traffic.pcapng"
-              pure
-                TWireshark
-                  { twKeyLog = keyLog,
-                    twRequestMeta = reqMeta,
-                    twData = reqData
-                  }
-            else TNone <$> hashFile fd "data.tar"
+        dataFile <- P.openFdAt (Just fd) "data.tar" P.ReadOnly P.defaultFileFlags >>= P.fdToHandle
+        traffic <- case metaTraffic meta of
+          Just TtWireshark -> do
+            keyLog <- hashFile fd "sslkeylog.keys"
+            reqMeta <- hashFile fd "request_meta.tar"
+            reqData <- hashFile fd "traffic.pcapng"
+            pure
+              TWireshark
+                { twKeyLog = keyLog,
+                  twRequestMeta = reqMeta,
+                  twData = reqData
+                }
+          Nothing -> do
+            h <- hashHandle dataFile
+            hSeek dataFile AbsoluteSeek 0
+            pure (TNone (DigestField h))
         pure
-          ( FetchInfo
-              { tiTimestamp = fmTimestamp meta,
-                tiLog = logFile,
-                tiUser = fmUser meta,
-                tiTraffic = traffic
-              }
-          )
+          Fetch
+            { fInstance = fmInstance fetchMeta,
+              fInfo =
+                FetchInfo
+                  { tiStartTime = metaStartTime meta,
+                    tiEndTime = metaEndTime meta,
+                    tiUser = metaUser meta,
+                    tiTraffic = traffic,
+                    tiLog = logFile
+                  },
+              fData = dataFile
+            }
     )
 
-addFetch ::
-  (FromJSON l, ToCbor h, ToCbor st, ToCbor rt, ToCbor l) =>
-  OS.ObjectStore h a st rt ->
-  Bool ->
-  rt ->
-  FilePath ->
-  IO (ObjectId (FetchInfo l))
-addFetch objStore isWireshark ty fetch =
-  fetchInfo fetch isWireshark >>= \info ->
-    OS.objectId <$> OS.addObject objStore (OtRecord ty) 1 info
-
-addWiresharkFetch ::
-  (FromJSON l, ToCbor h, ToCbor st, ToCbor rt, ToCbor l) =>
-  OS.ObjectStore h a st rt ->
+withFetch ::
+  forall i t l c.
+  (FromJSON i, Show t, Eq t, Typeable t, FromJSON t, FromJSON l) =>
   BS.BlobStore ->
-  rt ->
+  Text ->
+  t ->
   FilePath ->
-  IO (FetchId l)
-addWiresharkFetch objStore _ = addFetch objStore True
-
-addFetchNoTraffic ::
-  (FromJSON l, ToCbor h, ToCbor st, ToCbor rt, ToCbor l) =>
-  OS.ObjectStore h a st rt ->
-  BS.BlobStore ->
-  rt ->
-  FilePath ->
-  IO (ObjectId (FetchInfo l))
-addFetchNoTraffic objStore _ = addFetch objStore False
+  (Fetch i l -> IO c) ->
+  IO c
+withFetch _ server ty p =
+  bracket (readFetch server ty p) (hClose . fData)

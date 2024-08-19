@@ -12,6 +12,14 @@ pub const SERVER: Server<&'static str> = Server {
 
 pub type Instance = ();
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FetchType {
+    #[serde(rename = "rest_api")]
+    RestApi,
+    #[serde(rename = "image")]
+    Image,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RecordType {
     #[serde(rename = "image_request")]

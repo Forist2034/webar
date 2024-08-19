@@ -13,10 +13,13 @@ use uuid::Uuid;
 use webar_core::{
     blob::{BlobId, ImageData},
     digest::Digest,
-    fetch::http::{FetchMeta, LOG_FILE, META_FILE},
+    fetch::{
+        http::{Metadata, LOG_FILE},
+        FetchMeta, META_FILE,
+    },
     http, Timestamp,
 };
-use webar_data::ser::{Never, Serialize};
+use webar_data::ser::Serialize;
 use webar_image_store::blob;
 use webar_media_core::image::{
     fetcher::{HttpRequest, ImageSpec},
@@ -153,10 +156,20 @@ pub struct Config {
     pub user_agent: &'static str,
 }
 
-fn run<I: Debug + Serialize + DeserializeOwned>(
+pub trait ServerConfig {
+    type Instance: Serialize;
+    type FetchType: Serialize;
+    type Id: Debug + Serialize + DeserializeOwned;
+
+    const SERVER: &'static str;
+    const FETCH_TYPE: Self::FetchType;
+}
+
+fn run<S: ServerConfig>(
     root: BorrowedFd,
     cfg: Config,
     args: &Args,
+    instance: S::Instance,
 ) -> Result<()> {
     fs::mkdirat(root, c"data", Mode::from_raw_mode(0o777)).context("failed to create data dir")?;
     let ctx = Context {
@@ -186,8 +199,10 @@ fn run<I: Debug + Serialize + DeserializeOwned>(
     ));
     let mut header = tar::Header::new_gnu();
     header.set_mode(0o444);
+    let start_time = Timestamp::now();
+
     for (idx, spec) in specs.into_iter().enumerate() {
-        match fetch_image::<I>(&ctx, idx as u32, spec) {
+        match fetch_image::<S::Id>(&ctx, idx as u32, spec) {
             Ok(d) => {
                 let dat = webar_data::cbor::to_vec(&d);
                 header.set_size(dat.len() as u64);
@@ -203,12 +218,21 @@ fn run<I: Debug + Serialize + DeserializeOwned>(
         .context("failed to finish tar")?
         .into_inner()
         .context("failed to flush tar buffer")?;
+
     open(root, META_FILE.c_path)
         .context("failed to open meta file")?
         .write_all(
-            webar_data::cbor::to_vec::<FetchMeta<Never>>(&FetchMeta {
-                timestamp: Timestamp::now(),
-                user: None,
+            webar_data::cbor::to_vec(&FetchMeta {
+                server: S::SERVER,
+                instance,
+                ty: S::FETCH_TYPE,
+                version: 1,
+                data: Metadata {
+                    start_time,
+                    end_time: Timestamp::now(),
+                    traffic: None,
+                    user: (),
+                },
             })
             .as_slice(),
         )
@@ -216,7 +240,7 @@ fn run<I: Debug + Serialize + DeserializeOwned>(
     Ok(())
 }
 
-pub fn main<I: Debug + Serialize + DeserializeOwned>(cfg: Config) -> ExitCode {
+pub fn main<S: ServerConfig>(cfg: Config, instance: S::Instance) -> ExitCode {
     let args = Args::parse();
     let root = match init(&args.dest) {
         Ok(v) => v,
@@ -226,7 +250,7 @@ pub fn main<I: Debug + Serialize + DeserializeOwned>(cfg: Config) -> ExitCode {
         }
     };
     let _span = tracing::info_span!("image_fetcher", webar.root = true).entered();
-    match run::<I>(root.as_fd(), cfg, &args) {
+    match run::<S>(root.as_fd(), cfg, &args, instance) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!("{e:?}");

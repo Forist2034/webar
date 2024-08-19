@@ -37,7 +37,7 @@ import Webar.Blob
 import qualified Webar.Data.BinJson as BinJson
 import qualified Webar.Data.Cbor as Cbor
 import qualified Webar.Data.Json as Json
-import Webar.Fetch.Http.Store (addWiresharkFetch)
+import Webar.Fetch.Http.Store (Fetch (..), withFetch)
 import Webar.Http
 import Webar.Object
 import Webar.Server.StackExchange.Api.Filter (FilterId)
@@ -537,24 +537,27 @@ main = do
       args.argStoreRoot
       args.argServerRoot
       ( \ds ->
-          withObjectStore
-            args.argStoreRoot
-            args.argServerRoot
-            ( \os -> do
-                fetchId <- addWiresharkFetch os ds (RtApiRequest RrFetch) args.argFetchRoot
-                let context =
-                      Context
-                        { ctxDataStore = ds,
-                          ctxObjectStore = os,
-                          ctxFetchId = fetchId,
-                          ctxContentImages = isJust (argContentImages args),
-                          ctxProfileImages = isJust (argProfileImages args)
-                        }
-                C.withSourceFile
-                  (args.argFetchRoot ++ "/data.tar")
-                  ( \i ->
+          withFetch @() @FetchType @()
+            ds
+            (serverName server)
+            FtRestApi
+            args.argFetchRoot
+            ( \f ->
+                withObjectStore
+                  args.argStoreRoot
+                  args.argServerRoot
+                  ( \os -> do
+                      fetchId <- OS.addObject os (OtRecord (RtApiRequest RrFetch)) 1 f.fInfo
+                      let context =
+                            Context
+                              { ctxDataStore = ds,
+                                ctxObjectStore = os,
+                                ctxFetchId = fetchId.objectId,
+                                ctxContentImages = isJust (argContentImages args),
+                                ctxProfileImages = isJust (argProfileImages args)
+                              }
                       C.runConduit
-                        ( i
+                        ( C.sourceHandle f.fData
                             .| Tar.untar
                               ( \fi ->
                                   C.map BSB.byteString .| C.sinkLazyBuilder >>= \ent ->

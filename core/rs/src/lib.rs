@@ -12,9 +12,7 @@ pub mod blob;
 
 pub mod object;
 
-pub mod fetch {
-    pub mod http;
-}
+pub mod fetch;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Timestamp {

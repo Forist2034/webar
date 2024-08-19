@@ -14,17 +14,22 @@ use webar_media_core::image::{
     source::{Content, FetchId, HttpInfo, Image, RequestRecord, Response, SnapshotType},
 };
 extern crate webar_image_store as store;
-use store::fetch::http::add_fetch_no_traffic;
+use store::fetch::http::read_fetch;
 
 pub trait ServerConfig {
     const SERVER: Server<&'static str>;
 
     type ImageId: Serialize + DeserializeOwned;
-    type Instance: Serialize + Copy;
+    type Instance: Serialize + DeserializeOwned;
+    type InstanceRef<'a>: Serialize + Copy;
+    type FetchType: Debug + Eq + DeserializeOwned + Send + Sync + 'static;
     type Archive: Debug + Serialize;
     type Snapshot: Serialize;
     type Record: Serialize;
 
+    const FETCH_TYPE: Self::FetchType;
+
+    fn instance_ref<'a>(instance: &'a Self::Instance) -> Self::InstanceRef<'a>;
     fn to_snapshot(ty: SnapshotType) -> Self::Snapshot;
     fn to_record(record: RequestRecord) -> Self::Record;
     fn to_archive(image_id: Self::ImageId) -> Self::Archive;
@@ -35,8 +40,13 @@ struct Context<'a, S: ServerConfig> {
     fetch_blob: store::blob::store::BaseStore,
     blob_store: store::blob::store::WebsiteStore<'a>,
     blob_index: store::blob::index::Index<store::blob::index::ReadWrite>,
-    object_store:
-        store::object::store::WebsiteStore<'a, S::Instance, S::Archive, S::Snapshot, S::Record>,
+    object_store: store::object::store::WebsiteStore<
+        'a,
+        S::InstanceRef<'a>,
+        S::Archive,
+        S::Snapshot,
+        S::Record,
+    >,
     object_index: store::object::index::Index<store::object::index::ReadWrite>,
 }
 
@@ -123,12 +133,7 @@ fn add_image<'a, S: ServerConfig>(ctx: &Context<'a, S>, seq: usize, data: &[u8])
     Ok(())
 }
 
-fn run<'a, S: ServerConfig>(
-    instance: S::Instance,
-    root_path: &Path,
-    server_path: &str,
-    fetch_root: &str,
-) -> Result<()> {
+fn run<'a, S: ServerConfig>(root_path: &Path, server_path: &str, fetch_root: &str) -> Result<()> {
     let root = fs::open(root_path, OFlags::PATH | OFlags::DIRECTORY, Mode::empty())
         .context("failed to open root")?;
     let server_root = fs::open(server_path, OFlags::PATH | OFlags::DIRECTORY, Mode::empty())
@@ -142,22 +147,31 @@ fn run<'a, S: ServerConfig>(
     let blob_store =
         store::blob::store::WebsiteStore::open_at(&blob_base, server_root.as_fd(), c"store/blob")
             .context("failed to open website blob store")?;
+    let fetch = read_fetch(
+        S::SERVER.name,
+        fetch_root.as_fd(),
+        S::FETCH_TYPE,
+        &blob_store,
+    )
+    .context("failed to read fetch")?;
     let object_store = store::object::store::WebsiteStore::open_at(
         S::SERVER,
-        instance,
+        S::instance_ref(&fetch.instance),
         &object_base,
         server_root.as_fd(),
         c"store/object",
     )
     .context("failed to open website object store")?;
+
     let context: Context<S> = Context {
-        fetch_id: add_fetch_no_traffic(
-            fetch_root.as_fd(),
-            &object_store,
-            &blob_store,
-            S::to_record(RequestRecord::Fetch),
-        )
-        .context("failed to add fetch")?,
+        fetch_id: object_store
+            .add_object(
+                webar_core::object::ObjectType::Record(S::to_record(RequestRecord::Fetch)),
+                1,
+                &fetch.info,
+            )
+            .context("failed to add fetch")?
+            .id,
         fetch_blob: store::blob::store::BaseStore::open_at(fetch_root.as_fd(), c"data")
             .context("failed to open fetch data")?,
         blob_store,
@@ -196,13 +210,8 @@ fn run<'a, S: ServerConfig>(
     Ok(())
 }
 
-pub fn main<S: ServerConfig>(
-    instance: S::Instance,
-    root: &str,
-    server_root: &str,
-    fetch_root: &str,
-) -> ExitCode {
-    match run::<S>(instance, root.as_ref(), server_root, fetch_root) {
+pub fn main<S: ServerConfig>(root: &str, server_root: &str, fetch_root: &str) -> ExitCode {
+    match run::<S>(root.as_ref(), server_root, fetch_root) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("{e:?}");

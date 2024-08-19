@@ -14,12 +14,15 @@ use rustix::{
     fs::{Mode, OFlags},
 };
 use webar_core::{
-    fetch::http::{FetchMeta, KEY_LOG_FILE, LOG_FILE, META_FILE, REQUEST_META_FILE},
+    fetch::{
+        http::{Metadata, KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE},
+        FetchMeta, META_FILE,
+    },
     Timestamp,
 };
-use webar_data::ser::Never;
 use webar_stackexchange_core::{
     id::{QuestionId, TagName},
+    source::{FetchType, SERVER},
     KnownSite,
 };
 use webar_stackexchange_fetcher::{
@@ -84,14 +87,7 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
             io::BufWriter::new(open(root, c"data.tar").context("failed to open data file")?),
         ),
     };
-    let meta: FetchMeta<Never> = FetchMeta {
-        timestamp: Timestamp::now(),
-        user: None,
-    };
-    open(root, META_FILE.c_path)
-        .context("failed to open meta file")?
-        .write_all(&webar_data::json::to_vec(&meta).unwrap())
-        .context("failed to write fetch metadata")?;
+    let start_time = Timestamp::now();
 
     fetcher
         .fetch_object(GetInfo)
@@ -235,6 +231,23 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
     let (meta, data) = fetcher.sink.into_inner().context("failed to close sink")?;
     meta.into_inner().context("failed to flush meta file")?;
     data.into_inner().context("failed to flush data file")?;
+
+    let meta = FetchMeta {
+        server: SERVER.name,
+        instance: (),
+        ty: FetchType::RestApi,
+        version: 1,
+        data: Metadata {
+            start_time,
+            end_time: Timestamp::now(),
+            traffic: Some(webar_core::fetch::http::TrafficType::Wireshark),
+            user: (),
+        },
+    };
+    open(root, META_FILE.c_path)
+        .context("failed to open meta file")?
+        .write_all(&webar_data::json::to_vec(&meta).unwrap())
+        .context("failed to write fetch metadata")?;
     Ok(())
 }
 

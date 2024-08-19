@@ -12,6 +12,15 @@ import Webar.Server.StackExchange.Types (ApiSiteParameter)
 server :: Server
 server = Server {serverName = "StackExchange", serverVersion = 1}
 
+data FetchType
+  = FtRestApi
+  | FtImage
+  deriving (Show, Eq)
+
+deriveSumData
+  defaultSumOptions {constructorTagModifier = camelTo2 '_' . drop 2}
+  ''FetchType
+
 data RecordType
   = RtApiRequest {-# UNPACK #-} Api.Request.RequestRecord
   | RtFilter
