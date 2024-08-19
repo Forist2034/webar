@@ -14,5 +14,5 @@ data ImageSpec i = ImageSpec
   deriving (Show)
 
 deriveProdToCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''ImageSpec

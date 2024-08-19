@@ -21,9 +21,8 @@ newtype RequestId = ReqXRequestId UUID
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '-' . drop 3
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '-' . drop 3
     }
   ''RequestId
 
@@ -31,9 +30,8 @@ newtype ResponseId = RespXRequestGuid UUID
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '-' . drop 4
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '-' . drop 4
     }
   ''ResponseId
 
@@ -54,7 +52,7 @@ data HttpInfo = HttpInfo
   deriving (Show)
 
 deriveProdCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''HttpInfo
 
 type HttpResponseId = ObjectId HttpInfo
@@ -74,9 +72,8 @@ data ApiObjectType
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''ApiObjectType
 
@@ -98,9 +95,8 @@ data UserListReq = UlAnswer | UlBadge | UlComment | UlQuestion
 $( concat
      <$> traverse
        ( deriveSumData
-           SumOptions
-             { sumProduct = ProductOptions {fieldLabelModifier = id},
-               constructorTagModifier = camelTo2 '_' . drop 2
+           defaultSumOptions
+             { constructorTagModifier = camelTo2 '_' . drop 2
              }
        )
        [ ''AnswerListReq,
@@ -136,9 +132,9 @@ data ListRequest
   deriving (Show)
 
 deriveSumData
-  SumOptions
+  defaultSumOptions
     { sumProduct =
-        ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
+        defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''ListRequest
@@ -156,8 +152,8 @@ data ResponseData r
   deriving (Show)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''ResponseData
@@ -174,7 +170,7 @@ data ApiInfo = ApiInfo
   deriving (Show)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''ApiInfo
 
 type ApiResponseId = ObjectId ApiInfo
@@ -183,8 +179,7 @@ data RequestRecord = RrFetch | RrHttpRequest | RrApiResponse
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''RequestRecord

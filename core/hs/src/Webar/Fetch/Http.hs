@@ -47,8 +47,8 @@ data Traffic
   deriving (Show)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
       constructorTagModifier = camelTo2 '_' . tail
     }
   ''Traffic
@@ -62,7 +62,7 @@ data FetchInfo l = FetchInfo
   deriving (Show)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''FetchInfo
 
 type FetchId l = ObjectId (FetchInfo l)

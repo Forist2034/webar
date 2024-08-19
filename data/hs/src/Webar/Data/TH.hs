@@ -1,6 +1,8 @@
 module Webar.Data.TH
   ( ProductOptions (..),
+    defaultProductOptions,
     SumOptions (..),
+    defaultSumOptions,
     camelTo2,
     deriveProdData,
     deriveSumData,

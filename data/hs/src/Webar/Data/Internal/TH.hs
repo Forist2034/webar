@@ -2,8 +2,10 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Webar.Data.Internal.TH
-  ( ProductOptions (..),
-    SumOptions (..),
+  ( ProductOptions (fieldLabelModifier),
+    defaultProductOptions,
+    SumOptions (constructorTagModifier, sumProduct),
+    defaultSumOptions,
     camelTo2,
     Class (..),
     Serializer (..),
@@ -34,14 +36,29 @@ import qualified Data.Text as T
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 
+-- | constructor is not exported, so that new options can be added
 newtype ProductOptions = ProductOptions
   { fieldLabelModifier :: String -> String
   }
 
+defaultProductOptions :: ProductOptions
+defaultProductOptions =
+  ProductOptions
+    { fieldLabelModifier = id
+    }
+
+-- | construstor is not exported, so that new options can be added
 data SumOptions = SumOptions
   { constructorTagModifier :: String -> String,
     sumProduct :: ProductOptions
   }
+
+defaultSumOptions :: SumOptions
+defaultSumOptions =
+  SumOptions
+    { constructorTagModifier = id,
+      sumProduct = defaultProductOptions
+    }
 
 data Class = Class
   { clsName :: Name,

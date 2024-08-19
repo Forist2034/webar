@@ -63,8 +63,8 @@ data ObjectType archive st rt
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''ObjectType
@@ -77,7 +77,7 @@ data ObjectInfo h archive st rt = ObjectInfo
   deriving (Show, Eq)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''ObjectInfo
 
 encodeObject ::

@@ -19,9 +19,8 @@ data RecordType
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''RecordType
 
@@ -31,9 +30,8 @@ data ArchiveInfo
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''ArchiveInfo
 
@@ -45,8 +43,7 @@ data SnapshotType
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''SnapshotType

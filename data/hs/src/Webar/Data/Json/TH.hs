@@ -3,7 +3,9 @@
 
 module Webar.Data.Json.TH
   ( ProductOptions (..),
+    defaultProductOptions,
     SumOptions (..),
+    defaultSumOptions,
     camelTo2,
     mkSumToJSON,
     mkProdToJSON,

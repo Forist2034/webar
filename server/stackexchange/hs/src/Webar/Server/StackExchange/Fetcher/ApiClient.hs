@@ -18,7 +18,7 @@ data HttpRequest = HttpRequest
   deriving (Show)
 
 deriveProdFromCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''HttpRequest
 
 data ApiResponse = ApiResponse
@@ -31,5 +31,5 @@ data ApiResponse = ApiResponse
   deriving (Show)
 
 deriveProdFromCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''ApiResponse

@@ -14,8 +14,7 @@ data ApiVersion
   deriving (Show, Eq, Ord)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = fmap (\c -> if c == '_' then '.' else c) . drop 3
+  defaultSumOptions
+    { constructorTagModifier = fmap (\c -> if c == '_' then '.' else c) . drop 3
     }
   ''ApiVersion

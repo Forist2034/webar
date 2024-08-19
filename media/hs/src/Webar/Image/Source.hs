@@ -31,9 +31,8 @@ newtype RequestId = XRequestId UUID
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '-'
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '-'
     }
   ''RequestId
 
@@ -49,16 +48,15 @@ data HttpInfo = HttpInfo
   deriving (Show)
 
 deriveProdCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''HttpInfo
 
 data RequestRecord = RrFetch | RrHttpRequest
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''RequestRecord
 
@@ -66,9 +64,8 @@ newtype Content = CNormal (BlobId ImageData)
   deriving (Show)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . tail
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . tail
     }
   ''Content
 
@@ -81,15 +78,14 @@ data Image = Image
   deriving (Show)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''Image
 
 data SnapshotType = IsImage
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''SnapshotType

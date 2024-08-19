@@ -94,9 +94,8 @@ newtype Digest = DSha256 Sha256
   deriving (Show, Eq, Ord)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . tail
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . tail
     }
   ''Digest
 

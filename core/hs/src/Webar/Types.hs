@@ -12,5 +12,5 @@ data Timestamp = Timestamp
   deriving (Show, Eq, Ord)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''Timestamp

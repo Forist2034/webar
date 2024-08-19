@@ -50,7 +50,7 @@ data ProdSample = ProdSample
   deriving (Show, Eq)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''ProdSample
 
 prodSample :: DataTests ProdSample
@@ -68,7 +68,7 @@ data ProdNormal = ProdNormal Int32 (V.Vector Int32) (V.Vector Word16)
   deriving (Show, Eq)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = id}
+  defaultProductOptions {fieldLabelModifier = id}
   ''ProdNormal
 
 prodNormal :: DataTests ProdNormal
@@ -91,7 +91,7 @@ data ProdSort = ProdSort
   deriving (Show, Eq)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''ProdSort
 
 prodSort :: DataTests ProdSort
@@ -117,7 +117,7 @@ data ProdSortInner = ProdSortInner
   deriving (Show, Eq)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''ProdSortInner
 
 data ProdSortNested = ProdSortNested
@@ -128,7 +128,7 @@ data ProdSortNested = ProdSortNested
   deriving (Show, Eq)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''ProdSortNested
 
 prodSortNested :: DataTests ProdSortNested
@@ -163,7 +163,7 @@ data ProdWeird = ProdWeird
   deriving (Show, Eq)
 
 deriveProdData
-  ProductOptions
+  defaultProductOptions
     { fieldLabelModifier = \case
         "pwCr" -> "\r"
         "pw1" -> "1"
@@ -200,9 +200,8 @@ data SumUnit
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 2
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''SumUnit
 
@@ -227,8 +226,8 @@ data SumRecord
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''SumRecord
@@ -244,8 +243,8 @@ data SumNormal
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = id},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''SumNormal
@@ -261,8 +260,8 @@ data SumUnary
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = id},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''SumUnary
@@ -285,8 +284,8 @@ data SumMixed
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3},
       constructorTagModifier = camelTo2 '_'
     }
   ''SumMixed

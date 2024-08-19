@@ -18,7 +18,7 @@ import qualified System.Posix.ByteString as P
 import Webar.Data.Cbor (ToCbor)
 import Webar.Data.Json (FromJSON)
 import qualified Webar.Data.Json as Json
-import Webar.Data.Json.TH (ProductOptions (..), camelTo2, deriveProdFromJSON)
+import Webar.Data.Json.TH
 import Webar.Digest (hashHandle)
 import Webar.Fetch.Http
 import Webar.Fetch.Http.Internal
@@ -34,7 +34,7 @@ data FetchMeta l = FetchMeta
   deriving (Show)
 
 deriveProdFromJSON
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''FetchMeta
 
 hashFile :: P.Fd -> P.RawFilePath -> IO (DigestField t)

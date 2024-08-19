@@ -16,8 +16,7 @@ newtype ArchiveImage
   deriving (Show, Eq, Ord)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 4
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 4
     }
   ''ArchiveImage

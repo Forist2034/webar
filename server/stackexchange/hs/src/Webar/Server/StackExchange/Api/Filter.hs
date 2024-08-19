@@ -32,7 +32,7 @@ data FilterInfo = FilterInfo
   deriving (Show)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''FilterInfo
 
 type FilterId = ObjectId FilterInfo
@@ -60,7 +60,7 @@ data TypeMap a = TypeMap
   deriving (Show, Functor, Foldable, Traversable)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''TypeMap
 
 filterFields :: (ToFilter a) => Proxy a -> Fields

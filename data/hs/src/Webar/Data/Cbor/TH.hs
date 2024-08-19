@@ -3,7 +3,9 @@
 
 module Webar.Data.Cbor.TH
   ( ProductOptions (..),
+    defaultProductOptions,
     SumOptions (..),
+    defaultSumOptions,
     camelTo2,
     mkSumToCbor,
     mkProdToCbor,

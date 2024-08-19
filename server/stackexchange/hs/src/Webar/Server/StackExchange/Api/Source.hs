@@ -15,12 +15,15 @@ module Webar.Server.StackExchange.Api.Source
     ArchiveTagSynonym (..),
     ArchiveUser (..),
     ArchiveSiteData (..),
+
     -- * Snapshot info
     ApiSnapshotType (..),
+
     -- ** api object
     ApiData,
     Content (..),
     ObjectMeta (..),
+
     -- ** item list
     ListData,
     ListContent (..),
@@ -80,9 +83,8 @@ data ArchiveUser = AUsrInfo | AUsrAnswer | AUsrBadge | AUsrComment | AUsrQuestio
 $( concat
      <$> traverse
        ( deriveSumData
-           SumOptions
-             { sumProduct = ProductOptions {fieldLabelModifier = id},
-               constructorTagModifier = camelTo2 '_' . drop 4
+           defaultSumOptions
+             { constructorTagModifier = camelTo2 '_' . drop 4
              }
        )
        [ ''ArchiveAnswer,
@@ -113,9 +115,8 @@ data ArchiveSiteData
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 3
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 3
     }
   ''ArchiveSiteData
 
@@ -123,9 +124,8 @@ data ApiSnapshotType = AstObject | AstList
   deriving (Show, Eq)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . drop 3
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . drop 3
     }
   ''ApiSnapshotType
 
@@ -134,9 +134,8 @@ newtype Content t
   deriving (Show)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = id},
-      constructorTagModifier = camelTo2 '_' . tail
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . tail
     }
   ''Content
 
@@ -151,7 +150,7 @@ data ObjectMeta t = ObjectMeta
   deriving (Show)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''ObjectMeta
 
 data ListContent t = LcNormal
@@ -161,8 +160,8 @@ data ListContent t = LcNormal
   deriving (Show)
 
 deriveSumData
-  SumOptions
-    { sumProduct = ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
+  defaultSumOptions
+    { sumProduct = defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2},
       constructorTagModifier = camelTo2 '_' . drop 2
     }
   ''ListContent
@@ -177,5 +176,5 @@ data ListMeta t = ListMeta
   deriving (Show)
 
 deriveProdData
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
   ''ListMeta

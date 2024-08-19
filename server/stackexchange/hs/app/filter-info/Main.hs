@@ -33,7 +33,7 @@ data FilterArgs = FilterArgs
   }
 
 deriveProdToJSON
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''FilterArgs
 
 mkFilter :: (ToFilter t) => Proxy t -> FilterArgs

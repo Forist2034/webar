@@ -93,7 +93,7 @@ data Request i b = Request
   deriving (Show)
 
 deriveProdCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''Request
 
 data Response i b = Response
@@ -106,5 +106,5 @@ data Response i b = Response
   deriving (Show)
 
 deriveProdCbor
-  ProductOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
   ''Response
