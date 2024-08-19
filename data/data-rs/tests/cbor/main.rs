@@ -269,7 +269,7 @@ mod struct_t {
     use serde::Deserialize;
     use webar_derive::Serialize;
 
-    use crate::test_serde;
+    use crate::{common::product, test_serde};
 
     mod sample {
         use crate::{common::product::Sample, test_serde};
@@ -333,6 +333,14 @@ mod struct_t {
                 include_bytes!("./data/prod_sort_nested_1.bin"),
             )
         }
+    }
+
+    #[test]
+    fn unsorted() {
+        test_serde(
+            product::ProdUnsorted::T0,
+            include_bytes!("./data/prod_unsorted_0.bin"),
+        )
     }
 
     #[test]
@@ -429,6 +437,43 @@ mod variant {
         #[test]
         fn var_nv2() {
             test_serde(Unary::nv2(), include_bytes!("./data/var_nv2.bin"))
+        }
+    }
+
+    mod unsorted {
+        use crate::{common::sum::Unsorted, test_serde};
+
+        #[test]
+        fn unit() {
+            test_serde(Unsorted::T_UNIT, include_bytes!("./data/var_sus_unit.bin"))
+        }
+        #[test]
+        fn unary() {
+            test_serde(
+                Unsorted::T_UNARY,
+                include_bytes!("./data/var_sus_unary.bin"),
+            )
+        }
+        #[test]
+        fn record1() {
+            test_serde(
+                Unsorted::t_record1(),
+                include_bytes!("./data/var_sus_record1.bin"),
+            )
+        }
+        #[test]
+        fn tuple() {
+            test_serde(
+                Unsorted::T_TUPLE,
+                include_bytes!("./data/var_sus_tuple.bin"),
+            )
+        }
+        #[test]
+        fn record2() {
+            test_serde(
+                Unsorted::T_RECORD2,
+                include_bytes!("./data/var_sus_record2.bin"),
+            )
         }
     }
 

@@ -85,6 +85,21 @@ pub mod product {
     }
 
     #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    #[data(sort_fields = false)]
+    pub struct ProdUnsorted {
+        b: u8,
+        a: bool,
+        ccc: i32,
+    }
+    impl ProdUnsorted {
+        pub const T0: Self = Self {
+            b: 10,
+            a: false,
+            ccc: -32768,
+        };
+    }
+
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
     pub struct Weird {
         #[serde(rename = "1")]
         one: String,
@@ -180,6 +195,38 @@ pub mod sum {
         pub fn nv2() -> Self {
             Self::Nv2(Vec::from([123, 456]))
         }
+    }
+
+    #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+    #[data(sort_fields = false)]
+    pub enum Unsorted {
+        #[serde(rename = "sus_unit")]
+        SusUnit,
+        #[serde(rename = "sus_unary")]
+        SusUnary(u8),
+        #[serde(rename = "sus_record1")]
+        SusRecord1 { s: String, v: bool, c: u8 },
+        #[serde(rename = "sus_tuple")]
+        SusTuple(i8, u16),
+        #[serde(rename = "sus_record2")]
+        SusRecord2 { c: i8, b: bool, cc: u16 },
+    }
+    impl Unsorted {
+        pub const T_UNIT: Self = Self::SusUnit;
+        pub const T_UNARY: Self = Self::SusUnary(255);
+        pub fn t_record1() -> Self {
+            Self::SusRecord1 {
+                s: "server".into(),
+                v: true,
+                c: 0,
+            }
+        }
+        pub const T_TUPLE: Self = Self::SusTuple(-128, 65535);
+        pub const T_RECORD2: Self = Self::SusRecord2 {
+            c: -128,
+            b: true,
+            cc: 65535,
+        };
     }
 
     #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]

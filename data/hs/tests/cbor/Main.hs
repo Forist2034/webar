@@ -133,11 +133,13 @@ main = hspec do
     prodNormal mkTest
     prodSort mkTest
     prodSortNested mkTest
+    prodUnsorted mkTest
   describe "sum" do
     unitSum mkTest
     recordSum mkTest
     normalSum mkTest
     unarySum mkTest
+    unsortedSum mkTest
     mixedSum mkTest
   uuidTests mkTest
   setTests mkTest

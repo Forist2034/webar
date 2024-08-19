@@ -119,6 +119,8 @@ mod array {
 }
 
 mod product {
+    use crate::common::product;
+
     mod sample {
         use crate::{common::product::Sample, test_serde};
 
@@ -184,9 +186,17 @@ mod product {
     }
 
     #[test]
+    fn unsorted() {
+        crate::test_serde(
+            product::ProdUnsorted::T0,
+            include_str!("./data/prod_unsorted_0.json"),
+        )
+    }
+
+    #[test]
     fn weird() {
         crate::test_serde(
-            crate::common::product::Weird::test(),
+            product::Weird::test(),
             include_str!("./data/prod_weird.json"),
         )
     }
@@ -246,6 +256,37 @@ mod sum {
         #[test]
         fn var_nv2() {
             test_serde(Unary::nv2(), include_str!("./data/var_nv2.json"))
+        }
+    }
+
+    mod unsorted {
+        use crate::{common::sum::Unsorted, test_serde};
+
+        #[test]
+        fn unit() {
+            test_serde(Unsorted::T_UNIT, include_str!("./data/var_sus_unit.json"))
+        }
+        #[test]
+        fn unary() {
+            test_serde(Unsorted::T_UNARY, include_str!("./data/var_sus_unary.json"))
+        }
+        #[test]
+        fn record1() {
+            test_serde(
+                Unsorted::t_record1(),
+                include_str!("./data/var_sus_record1.json"),
+            )
+        }
+        #[test]
+        fn tuple() {
+            test_serde(Unsorted::T_TUPLE, include_str!("./data/var_sus_tuple.json"))
+        }
+        #[test]
+        fn record2() {
+            test_serde(
+                Unsorted::T_RECORD2,
+                include_str!("./data/var_sus_record2.json"),
+            )
         }
     }
 

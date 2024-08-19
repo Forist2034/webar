@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Webar.Data.Internal.TH
-  ( ProductOptions (fieldLabelModifier),
+  ( ProductOptions (fieldLabelModifier, sortFields),
     defaultProductOptions,
     SumOptions (constructorTagModifier, sumProduct),
     defaultSumOptions,
@@ -37,14 +37,20 @@ import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
 
 -- | constructor is not exported, so that new options can be added
-newtype ProductOptions = ProductOptions
-  { fieldLabelModifier :: String -> String
+data ProductOptions = ProductOptions
+  { fieldLabelModifier :: String -> String,
+    -- | whether fields should be sorted.
+    --
+    --    Useful for envelop data where metadata like type and version should come
+    --    before data
+    sortFields :: Bool
   }
 
 defaultProductOptions :: ProductOptions
 defaultProductOptions =
   ProductOptions
-    { fieldLabelModifier = id
+    { fieldLabelModifier = id,
+      sortFields = True
     }
 
 -- | construstor is not exported, so that new options can be added
@@ -162,14 +168,15 @@ mkNormalEncoder ser cn cs = do
 
 sortRecFields :: ProductOptions -> [VarBangType] -> [(Text, Name)]
 sortRecFields opt fs =
-  L.sortOn
-    fst
-    ( fmap
-        ( \(n@(Name (OccName ns) _), _, _) ->
-            (T.pack (fieldLabelModifier opt ns), n)
-        )
-        fs
-    )
+  let names =
+        fmap
+          ( \(n@(Name (OccName ns) _), _, _) ->
+              (T.pack (fieldLabelModifier opt ns), n)
+          )
+          fs
+   in if sortFields opt
+        then L.sortOn fst names
+        else names
 
 mkRecordEncoder :: Serializer -> ProductOptions -> Name -> [VarBangType] -> Q (Pat, NonEmpty Exp)
 mkRecordEncoder ser opt cn fs = do

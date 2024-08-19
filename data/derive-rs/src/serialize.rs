@@ -28,9 +28,16 @@ struct Options {
     bound: Bound,
 }
 
+#[derive(Default, FromAttributes)]
+#[darling(default, attributes(data))]
+struct RecordOptions {
+    #[darling(default)]
+    sort_fields: Option<bool>,
+}
+
 #[derive(FromAttributes)]
 #[darling(attributes(serde))]
-struct BodyOptions {
+struct FieldOptions {
     rename: Option<String>,
 }
 
@@ -40,18 +47,20 @@ struct VariantOptions {
     rename: String,
 }
 
-fn derive_struct(serializer: &Ident, data: FieldsNamed) -> Block {
+fn derive_struct(serializer: &Ident, sort: bool, data: FieldsNamed) -> Block {
     let fields = {
         let mut ret = data
             .named
             .iter()
             .map(|f| {
-                let opt = BodyOptions::from_attributes(&f.attrs).unwrap();
+                let opt = FieldOptions::from_attributes(&f.attrs).unwrap();
                 let name = f.ident.as_ref().unwrap();
                 (opt.rename.unwrap_or_else(|| name.to_string()), name)
             })
             .collect::<Vec<_>>();
-        ret.sort_by(|v1, v2| v1.0.cmp(&v2.0));
+        if sort {
+            ret.sort_by(|v1, v2| v1.0.cmp(&v2.0));
+        }
         ret
     };
     let ser = Ident::new("__struct_ser", Span::call_site());
@@ -107,18 +116,26 @@ fn derive_tuple_struct(serializer: &Ident, data: FieldsUnnamed) -> Block {
     }
 }
 
-fn derive_struct_variant(serializer: &Ident, ident: Ident, name: &str, f: FieldsNamed) -> Arm {
+fn derive_struct_variant(
+    serializer: &Ident,
+    sort: bool,
+    ident: Ident,
+    name: &str,
+    f: FieldsNamed,
+) -> Arm {
     let fields = {
         let mut ret = f
             .named
             .iter()
             .map(|f| {
-                let opt = BodyOptions::from_attributes(&f.attrs).unwrap();
+                let opt = FieldOptions::from_attributes(&f.attrs).unwrap();
                 let ident = f.ident.as_ref().unwrap();
                 (opt.rename.unwrap_or_else(|| ident.to_string()), ident)
             })
             .collect::<Vec<_>>();
-        ret.sort_by(|l, r| l.0.cmp(&r.0));
+        if sort {
+            ret.sort_by(|l, r| l.0.cmp(&r.0));
+        }
         ret
     };
     let mut pat = Punctuated::new();
@@ -231,13 +248,13 @@ fn derive_tuple_variant(serializer: &Ident, ident: Ident, name: &str, f: FieldsU
     }
 }
 
-fn derive_enum(serializer: &Ident, data: DataEnum) -> Block {
+fn derive_enum(serializer: &Ident, sort: bool, data: DataEnum) -> Block {
     let mut arms = Vec::new();
     for v in data.variants {
         let opt = VariantOptions::from_attributes(&v.attrs).unwrap();
         let name = opt.rename;
         arms.push(match v.fields {
-            Fields::Named(n) => derive_struct_variant(serializer, v.ident, &name, n),
+            Fields::Named(n) => derive_struct_variant(serializer,sort, v.ident, &name, n),
             Fields::Unnamed(u) if u.unnamed.len() == 1 => {
                 let ident = v.ident;
                 let field = Ident::new("f", Span::call_site());
@@ -515,10 +532,14 @@ pub fn derive_serialize(input: DeriveInput) -> TokenStream {
     let body = if options.transparent {
         derive_transparent(&serializer, input.data)
     } else {
+        let sort = RecordOptions::from_attributes(&input.attrs)
+            .unwrap()
+            .sort_fields
+            .unwrap_or(true);
         match input.data {
-            Data::Enum(e) => derive_enum(&serializer, e),
+            Data::Enum(e) => derive_enum(&serializer, sort, e),
             Data::Struct(s) => match s.fields {
-                Fields::Named(n) => derive_struct(&serializer, n),
+                Fields::Named(n) => derive_struct(&serializer, sort, n),
                 Fields::Unnamed(u) => derive_tuple_struct(&serializer, u),
                 Fields::Unit => panic!("Unit struct is not supported"),
             },

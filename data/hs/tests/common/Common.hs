@@ -13,6 +13,8 @@ module Common
     prodSort,
     ProdSortNested,
     prodSortNested,
+    ProdUnsorted,
+    prodUnsorted,
     ProdWeird,
     prodWeird,
     SumUnit,
@@ -23,6 +25,8 @@ module Common
     recordSum,
     SumUnary,
     unarySum,
+    SumUnsorted,
+    unsortedSum,
     SumMixed,
     mixedSum,
     setTests,
@@ -150,6 +154,31 @@ prodSortNested mkTest = describe "sort_nested" do
       }
     "prod_sort_nested_1"
 
+data ProdUnsorted = ProdUnsorted
+  { psuB :: Word8,
+    psuA :: Bool,
+    psuCcc :: Int32
+  }
+  deriving (Show, Eq)
+
+deriveProdData
+  defaultProductOptions
+    { fieldLabelModifier = camelTo2 '_' . drop 3,
+      sortFields = False
+    }
+  ''ProdUnsorted
+
+prodUnsorted :: DataTests ProdUnsorted
+prodUnsorted mkTest =
+  mkTest
+    "unsorted"
+    ProdUnsorted
+      { psuB = 10,
+        psuA = False,
+        psuCcc = -32768
+      }
+    "prod_unsorted_0"
+
 data ProdWeird = ProdWeird
   { pwCr :: Text,
     pw1 :: Text,
@@ -270,6 +299,47 @@ unarySum :: DataTests SumUnary
 unarySum mkTest = describe "unary" do
   mkTest "nv1" (StNv True) "var_nv"
   mkTest "nv2" (StNv2 (V.fromList [123, 456])) "var_nv2"
+
+data SumUnsorted
+  = SusUnit
+  | SusUnary Word8
+  | SusRecord1
+      { suR1S :: Text,
+        suR1v :: Bool,
+        suR1c :: Word8
+      }
+  | SusTuple Int8 Word16
+  | SusRecord2
+      { suR2C :: Int8,
+        suR2B :: Bool,
+        suR2Cc :: Word16
+      }
+  deriving (Show, Eq)
+
+deriveSumData
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_',
+      sumProduct =
+        defaultProductOptions
+          { fieldLabelModifier = camelTo2 '_' . drop 4,
+            sortFields = False
+          }
+    }
+  ''SumUnsorted
+
+unsortedSum :: DataTests SumUnsorted
+unsortedSum mkTest = describe "unsorted" do
+  mkTest "unit" SusUnit "var_sus_unit"
+  mkTest "unary" (SusUnary 255) "var_sus_unary"
+  mkTest
+    "record1"
+    SusRecord1 {suR1S = "server", suR1v = True, suR1c = 0}
+    "var_sus_record1"
+  mkTest "tuple" (SusTuple (-128) 65535) "var_sus_tuple"
+  mkTest
+    "record2"
+    SusRecord2 {suR2C = -128, suR2B = True, suR2Cc = 65535}
+    "var_sus_record2"
 
 data SumMixed
   = MvUnit
