@@ -70,6 +70,7 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
                 .use_preconfigured_tls(webar_rustls::default_config(io::BufWriter::new(
                     open(root, KEY_LOG_FILE.c_path).context("failed to open keylog file")?,
                 )))
+                .user_agent("webar")
                 .https_only(true)
                 .build()
                 .context("failed to build client")?,
