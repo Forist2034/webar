@@ -292,16 +292,13 @@ impl Visit for IsRoot {
     fn record_error(&mut self, _: &tracing::field::Field, _: &(dyn std::error::Error + 'static)) {}
 }
 
-struct Inner<W> {
-    cbor: W,
-    json: W,
-}
+struct Inner<W>(W);
 
 pub struct WriteLayer<W>(Mutex<Option<Inner<W>>>);
 impl<W: Write> WriteLayer<W> {
-    pub fn new(mut cbor: W, json: W) -> Result<Self, io::Error> {
-        cbor.write_all(&[0x9f])?; // start streaming array
-        Ok(Self(Mutex::new(Some(Inner { cbor, json }))))
+    pub fn new(mut writer: W) -> Result<Self, io::Error> {
+        writer.write_all(&[0x9f])?; // start streaming array
+        Ok(Self(Mutex::new(Some(Inner(writer)))))
     }
     fn add_entry(&self, entry: &Entry) {
         let mut cbor = Vec::new();
@@ -312,8 +309,7 @@ impl<W: Write> WriteLayer<W> {
 
         let mut l = self.0.lock().unwrap();
         let w = l.as_mut().expect("write to finished log");
-        w.cbor.write_all(&cbor).unwrap();
-        w.json.write_all(json.as_bytes()).unwrap();
+        w.0.write_all(&cbor).unwrap();
     }
 }
 impl<W: std::io::Write + 'static, S> Layer<S> for WriteLayer<W>
@@ -383,7 +379,7 @@ where
                 .0
             {
                 let mut w = self.0.lock().unwrap().take().expect("finish log again");
-                w.cbor.write_all(&[0xff]).unwrap(); // finish array
+                w.0.write_all(&[0xff]).unwrap(); // finish array
             }
         }
     }

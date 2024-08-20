@@ -143,11 +143,8 @@ fn open(root: BorrowedFd, path: &CStr) -> Result<std::fs::File> {
 
 fn init(path: &str) -> Result<OwnedFd> {
     let root = fs::open(path, OFlags::PATH, Mode::empty()).context("failed to open dest dir")?;
-    webar_tracing::init(
-        open(root.as_fd(), LOG_FILE.c_path).context("failed to open cbor log")?,
-        open(root.as_fd(), c"log.json").context("failed to open json log file")?,
-    )
-    .context("failed to init tracing")?;
+    webar_tracing::init(open(root.as_fd(), LOG_FILE.c_path).context("failed to open log")?)
+        .context("failed to init tracing")?;
     Ok(root)
 }
 

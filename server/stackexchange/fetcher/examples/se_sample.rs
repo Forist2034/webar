@@ -50,11 +50,8 @@ fn open(root: BorrowedFd<'_>, name: &CStr) -> Result<std::fs::File, rustix::io::
 fn init(sink_path: &Path) -> anyhow::Result<OwnedFd> {
     let root = rustix::fs::open(sink_path, OFlags::PATH, Mode::all())
         .context("failed to open dest dir")?;
-    webar_tracing::init(
-        open(root.as_fd(), LOG_FILE.c_path).context("failed to open log file")?,
-        open(root.as_fd(), c"log.json").context("failed to open cbor log file")?,
-    )
-    .context("failed to init tracing log")?;
+    webar_tracing::init(open(root.as_fd(), LOG_FILE.c_path).context("failed to open log file")?)
+        .context("failed to init tracing log")?;
     Ok(root)
 }
 

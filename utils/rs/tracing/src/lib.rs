@@ -14,18 +14,18 @@ where
     fmt::layer().pretty()
 }
 
-pub fn init_no_filter(cbor_output: fs::File, json_output: fs::File) -> Result<(), io::Error> {
+pub fn init_no_filter(output: fs::File) -> Result<(), io::Error> {
     registry()
         .with(term_output())
-        .with(write::WriteLayer::new(cbor_output, json_output)?)
+        .with(write::WriteLayer::new(output)?)
         .init();
     Ok(())
 }
 
-pub fn init(cbor_output: fs::File, json_output: fs::File) -> Result<(), io::Error> {
+pub fn init(output: fs::File) -> Result<(), io::Error> {
     registry()
         .with(term_output().with_filter(LevelFilter::INFO))
-        .with(write::WriteLayer::new(cbor_output, json_output)?)
+        .with(write::WriteLayer::new(output)?)
         .init();
     Ok(())
 }
