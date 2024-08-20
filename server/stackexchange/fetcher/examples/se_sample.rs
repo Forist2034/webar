@@ -78,9 +78,6 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
             io::BufWriter::new(
                 open(root, REQUEST_META_FILE.c_path).context("failed to open meta file")?,
             ),
-            io::BufWriter::new(
-                open(root, c"meta_json.tar").context("failed to open meta json file")?,
-            ),
             io::BufWriter::new(open(root, c"data.tar").context("failed to open data file")?),
         ),
     };

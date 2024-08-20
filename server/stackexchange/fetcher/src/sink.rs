@@ -1,7 +1,7 @@
 use std::{io, path::Path};
 
 use webar_data::{
-    cbor, json,
+    cbor,
     ser::{Never, Serialize},
 };
 
@@ -25,14 +25,12 @@ fn add_file<W: io::Write>(
 
 pub struct TarSink<MW: io::Write, RW: io::Write> {
     meta: tar::Builder<MW>,
-    meta_json: tar::Builder<MW>,
     response: tar::Builder<RW>,
 }
 impl<MW: io::Write, RW: io::Write> TarSink<MW, RW> {
-    pub fn new(meta: MW, meta_json: MW, response: RW) -> Self {
+    pub fn new(meta: MW, response: RW) -> Self {
         Self {
             meta: tar::Builder::new(meta),
-            meta_json: tar::Builder::new(meta_json),
             response: tar::Builder::new(response),
         }
     }
@@ -42,11 +40,6 @@ impl<MW: io::Write, RW: io::Write> TarSink<MW, RW> {
             &mut self.meta,
             format!("{}.bin", meta.seq),
             &cbor::to_vec(meta),
-        )?;
-        add_file(
-            &mut self.meta_json,
-            format!("{}.json", meta.seq),
-            &json::to_vec(meta).unwrap(),
         )
     }
     fn add_response<O: Serialize>(&mut self, response: &ApiResponse<O>) -> Result<(), Error> {
