@@ -246,7 +246,7 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
     };
     open(root, META_FILE.c_path)
         .context("failed to open meta file")?
-        .write_all(&webar_data::json::to_vec(&meta).unwrap())
+        .write_all(&webar_data::cbor::to_vec(&meta))
         .context("failed to write fetch metadata")?;
     Ok(())
 }

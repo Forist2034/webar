@@ -18,8 +18,8 @@ import System.FilePath ((</>))
 import System.IO
 import qualified System.Posix as P.FilePath
 import qualified System.Posix.ByteString as P
-import Webar.Data.Json (FromJSON)
-import qualified Webar.Data.Json as Json
+import Webar.Data.Cbor (FromCbor)
+import qualified Webar.Data.Cbor as Cbor
 import Webar.Digest (hashHandle)
 import Webar.Fetch
 import Webar.Fetch.Http
@@ -49,13 +49,13 @@ instance (Show t, Typeable t) => Exception (MetaException t)
 
 readFetch ::
   forall i t l.
-  (FromJSON i, FromJSON t, Show t, Eq t, Typeable t, FromJSON l) =>
+  (FromCbor i, FromCbor t, Show t, Eq t, Typeable t, FromCbor l) =>
   Text ->
   t ->
   FilePath ->
   IO (Fetch i l)
 readFetch server ty p = do
-  fetchMeta <- Json.decodeStrictBsThrow <$> BS.readFile (p </> "meta.json")
+  fetchMeta <- Cbor.decodeStrictBsThrow <$> BS.readFile (p </> "meta.bin")
   unless (fmServer fetchMeta == server) (throwIO (ServerMismatch @t (fmServer fetchMeta)))
   unless (fmType fetchMeta == ty) (throwIO (IncorrectType (fmType fetchMeta)))
   unless (fmVersion fetchMeta == 1) (throwIO (UnsupportedVersion @t (fmVersion fetchMeta)))
@@ -98,7 +98,7 @@ readFetch server ty p = do
 
 withFetch ::
   forall i t l c.
-  (FromJSON i, Show t, Eq t, Typeable t, FromJSON t, FromJSON l) =>
+  (FromCbor i, Show t, Eq t, Typeable t, FromCbor t, FromCbor l) =>
   BS.BlobStore ->
   Text ->
   t ->

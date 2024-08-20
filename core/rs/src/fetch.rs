@@ -18,6 +18,6 @@ pub struct FetchMeta<S, I, T, D> {
 }
 
 pub const META_FILE: FilePath = FilePath {
-    path: "meta.json",
-    c_path: c"meta.json",
+    path: "meta.bin",
+    c_path: c"meta.bin",
 };
