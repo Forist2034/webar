@@ -20,6 +20,7 @@ use webar_core::{
         },
         FetchMeta, META_FILE,
     },
+    Version,
 };
 
 use crate::{blob, perm};
@@ -77,7 +78,7 @@ enum InnerError<T> {
     #[error("unexpected server name {0:?}")]
     ServerMismatch(String),
     #[error("unsupported version {0}")]
-    UnsupportedVersion(u8),
+    UnsupportedVersion(Version),
     #[error("incorrect type {0:?}")]
     IncorrectType(T),
 }
@@ -111,7 +112,7 @@ where
     if fetch_meta.ty != ty {
         return Err(InnerError::IncorrectType(fetch_meta.ty));
     }
-    if fetch_meta.version != 1 {
+    if fetch_meta.version.0 != 1 || fetch_meta.version.1 != 0 {
         return Err(InnerError::UnsupportedVersion(fetch_meta.version));
     }
     let meta = fetch_meta.data;

@@ -3,33 +3,20 @@ use std::{fmt::Debug, marker::PhantomData};
 use serde::Deserialize;
 use webar_data::ser::Serialize;
 
-use crate::digest::Digest;
+use crate::{digest::Digest, Version};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub struct Server<N> {
     pub name: N,
-    pub version: u8,
+    pub version: Version,
 }
-impl<N: AsRef<str>> Serialize for Server<N> {
+impl<N: Serialize> Serialize for Server<N> {
     fn serialize<S: webar_data::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use webar_data::ser::SerializeTupleStruct;
-        let mut s = serializer.serialize_tuple_struct(2)?;
-        s.serialize_field(self.name.as_ref())?;
-        s.serialize_field(&self.version)?;
-        s.end()
-    }
-}
-impl<'de, N: Deserialize<'de>> Deserialize<'de> for Server<N> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct ServerTuple<N>(N, u8);
-        ServerTuple::deserialize(deserializer).map(|t| Self {
-            name: t.0,
-            version: t.1,
-        })
+        let mut ser = serializer.serialize_tuple_struct(2)?;
+        ser.serialize_field(&self.name)?;
+        ser.serialize_field(&self.version)?;
+        ser.end()
     }
 }
 
@@ -113,10 +100,10 @@ pub struct ObjectInfo<Inst, Archive, Snapshot, Record> {
     pub instance: Inst,
     #[serde(rename = "type")]
     pub ty: ObjectType<Archive, Snapshot, Record>,
-    pub version: u8,
+    pub version: Version,
 }
 
-pub fn encode_object<N: AsRef<str>, Inst, Archive, Snapshot, Record, D>(
+pub fn encode_object<N: Serialize, Inst, Archive, Snapshot, Record, D>(
     server: &Server<N>,
     info: &ObjectInfo<Inst, Archive, Snapshot, Record>,
     data: &D,

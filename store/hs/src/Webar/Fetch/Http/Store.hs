@@ -13,7 +13,6 @@ import Control.Monad (unless)
 import qualified Data.ByteString as BS
 import Data.Data (Typeable)
 import Data.Text (Text)
-import Data.Word (Word8)
 import System.FilePath ((</>))
 import System.IO
 import qualified System.Posix as P.FilePath
@@ -25,6 +24,7 @@ import Webar.Fetch
 import Webar.Fetch.Http
 import Webar.Fetch.Http.Internal
 import qualified Webar.Store.Blob.WithShared as BS
+import Webar.Types (Version (Version))
 
 data Fetch i l = Fetch
   { fInstance :: i,
@@ -41,7 +41,7 @@ hashFile dirFd p =
 
 data MetaException t
   = ServerMismatch Text
-  | UnsupportedVersion Word8
+  | UnsupportedVersion Version
   | IncorrectType t
   deriving (Show)
 
@@ -58,7 +58,7 @@ readFetch server ty p = do
   fetchMeta <- Cbor.decodeStrictBsThrow <$> BS.readFile (p </> "meta.bin")
   unless (fmServer fetchMeta == server) (throwIO (ServerMismatch @t (fmServer fetchMeta)))
   unless (fmType fetchMeta == ty) (throwIO (IncorrectType (fmType fetchMeta)))
-  unless (fmVersion fetchMeta == 1) (throwIO (UnsupportedVersion @t (fmVersion fetchMeta)))
+  unless (fmVersion fetchMeta == Version 1 0) (throwIO (UnsupportedVersion @t (fmVersion fetchMeta)))
   let meta = fmData fetchMeta
   bracket
     (P.FilePath.openFd p P.FilePath.ReadOnly P.FilePath.defaultFileFlags)

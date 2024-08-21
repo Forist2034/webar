@@ -7,7 +7,7 @@ use rustix::{
 };
 use serde::de::DeserializeOwned;
 
-use webar_core::{blob::BlobId, fetch::http::DATA_FILE, object::Server};
+use webar_core::{blob::BlobId, fetch::http::DATA_FILE, object::Server, Version};
 use webar_data::ser::Serialize;
 use webar_media_core::image::{
     fetcher::HttpRequest,
@@ -69,7 +69,7 @@ fn add_image<'a, S: ServerConfig>(ctx: &Context<'a, S>, seq: usize, data: &[u8])
         .object_store
         .add_object(
             webar_core::object::ObjectType::Record(S::to_record(RequestRecord::HttpRequest)),
-            1,
+            Version(1, 0),
             &http_info,
         )
         .context("failed to add http info")?
@@ -77,7 +77,11 @@ fn add_image<'a, S: ServerConfig>(ctx: &Context<'a, S>, seq: usize, data: &[u8])
     let archive = S::to_archive(image.image_id);
     let archive_id = ctx
         .object_store
-        .add_object(webar_core::object::ObjectType::Archive, 1, &archive)
+        .add_object(
+            webar_core::object::ObjectType::Archive,
+            Version(1, 0),
+            &archive,
+        )
         .context("failed to add archive")?
         .id;
     let snapshot_id = ctx
@@ -87,7 +91,7 @@ fn add_image<'a, S: ServerConfig>(ctx: &Context<'a, S>, seq: usize, data: &[u8])
                 archive: archive_id,
                 ty: S::to_snapshot(SnapshotType::Image),
             },
-            1,
+            Version(1, 0),
             &Image {
                 fetch: ctx.fetch_id,
                 request: request_id,
@@ -167,7 +171,7 @@ fn run<'a, S: ServerConfig>(root_path: &Path, server_path: &str, fetch_root: &st
         fetch_id: object_store
             .add_object(
                 webar_core::object::ObjectType::Record(S::to_record(RequestRecord::Fetch)),
-                1,
+                Version(1, 0),
                 &fetch.info,
             )
             .context("failed to add fetch")?

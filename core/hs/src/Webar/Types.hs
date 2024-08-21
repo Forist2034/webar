@@ -2,7 +2,7 @@
 
 module Webar.Types where
 
-import Data.Word (Word32, Word64)
+import Data.Word (Word32, Word64, Word8)
 import Webar.Data.TH
 
 data Timestamp = Timestamp
@@ -14,3 +14,8 @@ data Timestamp = Timestamp
 deriveProdData
   defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''Timestamp
+
+data Version = Version {-# UNPACK #-} Word8 {-# UNPACK #-} Word8
+  deriving (Show, Eq, Ord)
+
+deriveProdData defaultProductOptions ''Version

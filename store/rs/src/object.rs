@@ -13,6 +13,7 @@ use rustix::{
 use webar_core::{
     digest::{Digest, Sha256},
     object::{self, ObjectId, ObjectInfo, ObjectType, Server},
+    Version,
 };
 use webar_data::ser::Serialize;
 
@@ -59,7 +60,7 @@ impl BaseStore {
         data: &Data,
     ) -> Result<ObjectHandle<Data>, Errno>
     where
-        N: AsRef<str>,
+        N: Serialize,
         Host: Serialize,
         Archive: Serialize,
         Snapshot: Serialize,
@@ -122,7 +123,7 @@ where
     pub fn add_object<T: Serialize>(
         &self,
         ty: ObjectType<Archive, Snapshot, Record>,
-        version: u8,
+        version: Version,
         data: &T,
     ) -> Result<ObjectHandle<T>, Errno> {
         let ret = self.base.add_object(

@@ -53,7 +53,7 @@ import Webar.Store.Blob.WithShared (BlobStore)
 import qualified Webar.Store.Blob.WithShared as DS
 import qualified Webar.Store.Object.Base as OS.B
 import qualified Webar.Store.Object.Website as OS
-import Webar.Types (Timestamp)
+import Webar.Types (Timestamp, Version (Version))
 
 type ObjectStore = OS.ObjectStore () ArchiveInfo SnapshotType RecordType
 
@@ -117,7 +117,7 @@ addHttpResponse ctx callSeq respIdx req =
       <$> OS.addObject
         ctx.ctxObjectStore
         (OtRecord (RtApiRequest RrHttpRequest))
-        1
+        (Version 1 0)
         HttpInfo
           { hiUrl = req.hrRequest.reqUrl,
             hiFetch = ctxFetchId ctx,
@@ -130,12 +130,12 @@ addHttpResponse ctx callSeq respIdx req =
 addApiResponse :: Context -> ApiInfo -> IO ApiResponseId
 addApiResponse ctx resp =
   OS.objectId
-    <$> OS.addObject ctx.ctxObjectStore (OtRecord (RtApiRequest RrApiResponse)) 1 resp
+    <$> OS.addObject ctx.ctxObjectStore (OtRecord (RtApiRequest RrApiResponse)) (Version 1 0) resp
 
 addSnapshot :: (Cbor.ToCbor a) => Context -> ArchiveInfo -> SnapshotType -> a -> IO ()
 addSnapshot ctx archive ty meta =
-  OS.addObject ctx.ctxObjectStore OtArchive 1 archive >>= \arch ->
-    void (OS.addObject ctx.ctxObjectStore (OtSnapshot arch.objectId ty) 1 meta)
+  OS.addObject ctx.ctxObjectStore OtArchive (Version 1 0) archive >>= \arch ->
+    void (OS.addObject ctx.ctxObjectStore (OtSnapshot arch.objectId ty) (Version 1 0) meta)
 
 data ItemMeta = ItemMeta
   { imSite :: !ApiSiteParameter,
@@ -547,7 +547,7 @@ main = do
                   args.argStoreRoot
                   args.argServerRoot
                   ( \os -> do
-                      fetchId <- OS.addObject os (OtRecord (RtApiRequest RrFetch)) 1 f.fInfo
+                      fetchId <- OS.addObject os (OtRecord (RtApiRequest RrFetch)) (Version 1 0) f.fInfo
                       let context =
                             Context
                               { ctxDataStore = ds,

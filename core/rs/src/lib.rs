@@ -1,4 +1,4 @@
-use std::time::SystemTime;
+use std::{fmt::Display, time::SystemTime};
 
 use serde::Deserialize;
 
@@ -31,6 +31,14 @@ impl From<SystemTime> for Timestamp {
             secs: d.as_secs(),
             nanos: d.subsec_nanos(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Version(pub u8, pub u8);
+impl Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}", self.0, self.1)
     }
 }
 

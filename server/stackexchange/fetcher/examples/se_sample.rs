@@ -18,7 +18,7 @@ use webar_core::{
         http::{Metadata, KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE},
         FetchMeta, META_FILE,
     },
-    Timestamp,
+    Timestamp, Version,
 };
 use webar_stackexchange_core::{
     id::{QuestionId, TagName},
@@ -231,7 +231,7 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
         server: SERVER.name,
         instance: (),
         ty: FetchType::RestApi,
-        version: 1,
+        version: Version(1, 0),
         data: Metadata {
             start_time,
             end_time: Timestamp::now(),

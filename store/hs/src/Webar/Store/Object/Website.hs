@@ -7,10 +7,10 @@ module Webar.Store.Object.Website
   )
 where
 
-import Data.Word (Word8)
 import Webar.Data.Cbor (ToCbor)
 import Webar.Object
 import qualified Webar.Store.Object.Base as OS
+import Webar.Types (Version)
 
 data ObjectStore h a st rt = ObjectStore
   { storeServer :: !Server,
@@ -27,7 +27,7 @@ addObject ::
   (ToCbor h, ToCbor st, ToCbor rt, ToCbor o) =>
   ObjectStore h a st rt ->
   ObjectType a st rt ->
-  Word8 ->
+  Version ->
   o ->
   IO (OS.ObjectHandle o)
 addObject s ot ver o =

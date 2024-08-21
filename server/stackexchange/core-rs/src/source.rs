@@ -1,13 +1,13 @@
 use serde::Deserialize;
 
-use webar_core::object::Server;
+use webar_core::{object::Server, Version};
 use webar_data::ser::Serialize;
 
 use crate::image;
 
 pub const SERVER: Server<&'static str> = Server {
     name: "StackExchange",
-    version: 1,
+    version: Version(1, 0),
 };
 
 pub type Instance = ();

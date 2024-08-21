@@ -8,9 +8,10 @@ import qualified Webar.Server.StackExchange.Api.Request as Api.Request
 import qualified Webar.Server.StackExchange.Api.Source as Api.Source
 import qualified Webar.Server.StackExchange.Image.Source as Img.Source
 import Webar.Server.StackExchange.Types (ApiSiteParameter)
+import Webar.Types (Version (Version))
 
 server :: Server
-server = Server {serverName = "StackExchange", serverVersion = 1}
+server = Server {serverName = "StackExchange", serverVersion = Version 1 0}
 
 data FetchType
   = FtRestApi

@@ -3,8 +3,8 @@
 module Webar.Fetch where
 
 import Data.Text (Text)
-import Data.Word (Word8)
 import Webar.Data.TH
+import Webar.Types (Version)
 
 -- | fetch metadata
 --
@@ -17,7 +17,7 @@ data FetchMeta i t d = FetchMeta
   { fmServer :: Text,
     fmInstance :: i,
     fmType :: t,
-    fmVersion :: Word8,
+    fmVersion :: Version,
     fmData :: d
   }
   deriving (Show)

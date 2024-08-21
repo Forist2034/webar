@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use webar_core::{
     digest::Digest,
     object::{encode_object, ObjectId, ObjectInfo, Server},
+    Version,
 };
 use webar_data::ser::{Never, Serialize};
 use webar_media_core::image::fetcher::ImageSpec;
@@ -52,7 +53,7 @@ fn run<S: ServerConfig>(
                     &ObjectInfo {
                         instance,
                         ty: webar_core::object::ObjectType::Archive::<S::Archive<'_>, Never, Never>,
-                        version: 1,
+                        version: Version(1, 0),
                     },
                     &S::to_archive(&spec.id),
                 )),

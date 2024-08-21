@@ -2,7 +2,7 @@ use serde::Deserialize;
 
 use webar_data::ser::Serialize;
 
-use crate::FilePath;
+use crate::{FilePath, Version};
 
 pub mod http;
 
@@ -13,7 +13,7 @@ pub struct FetchMeta<S, I, T, D> {
     pub instance: I,
     #[serde(rename = "type")]
     pub ty: T,
-    pub version: u8,
+    pub version: Version,
     pub data: D,
 }
 

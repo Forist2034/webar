@@ -17,7 +17,7 @@ use webar_core::{
         http::{Metadata, LOG_FILE},
         FetchMeta, META_FILE,
     },
-    http, Timestamp,
+    http, Timestamp, Version,
 };
 use webar_data::ser::Serialize;
 use webar_image_store::blob;
@@ -223,7 +223,7 @@ fn run<S: ServerConfig>(
                 server: S::SERVER,
                 instance,
                 ty: S::FETCH_TYPE,
-                version: 1,
+                version: Version(1, 0),
                 data: Metadata {
                     start_time,
                     end_time: Timestamp::now(),

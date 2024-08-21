@@ -26,6 +26,7 @@ import qualified Webar.Store.Blob.Base as DS.B
 import qualified Webar.Store.Blob.WithShared as DS
 import qualified Webar.Store.Object.Base as OS.B
 import qualified Webar.Store.Object.Website as OS
+import Webar.Types (Version (Version))
 
 newtype Wrapper = Wrapper (BinJson.WithBinValue Filter)
 
@@ -88,7 +89,7 @@ addFilter dataStore objStore resp = do
     OS.addObject
       objStore
       (OtRecord RtFilter)
-      1
+      (Version 1 0)
       FilterInfo
         { fiName = filFilter fil,
           fiSafe = case filFilterType fil of
