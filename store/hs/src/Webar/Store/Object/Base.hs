@@ -21,6 +21,7 @@ import Webar.Data.Cbor (ToCbor)
 import Webar.Digest
 import Webar.Object
 import Webar.Store.FileSystem
+import Webar.Types (Server)
 
 data Path = Path !ByteString !ByteString
 

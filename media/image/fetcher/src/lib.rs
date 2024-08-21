@@ -17,7 +17,7 @@ use webar_core::{
         http::{Metadata, LOG_FILE},
         FetchMeta, META_FILE,
     },
-    http, Timestamp, Version,
+    http, Server, Timestamp, Version,
 };
 use webar_data::ser::Serialize;
 use webar_image_store::blob;
@@ -158,7 +158,7 @@ pub trait ServerConfig {
     type FetchType: Serialize;
     type Id: Debug + Serialize + DeserializeOwned;
 
-    const SERVER: &'static str;
+    const SERVER: Server<&'static str>;
     const FETCH_TYPE: Self::FetchType;
 }
 

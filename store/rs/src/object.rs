@@ -12,8 +12,8 @@ use rustix::{
 };
 use webar_core::{
     digest::{Digest, Sha256},
-    object::{self, ObjectId, ObjectInfo, ObjectType, Server},
-    Version,
+    object::{self, ObjectId, ObjectInfo, ObjectType},
+    Server, Version,
 };
 use webar_data::ser::Serialize;
 

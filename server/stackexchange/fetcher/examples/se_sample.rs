@@ -228,7 +228,7 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
     data.into_inner().context("failed to flush data file")?;
 
     let meta = FetchMeta {
-        server: SERVER.name,
+        server: SERVER,
         instance: (),
         ty: FetchType::RestApi,
         version: Version(1, 0),

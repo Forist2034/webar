@@ -7,7 +7,7 @@ use rustix::{
 };
 use serde::de::DeserializeOwned;
 
-use webar_core::{blob::BlobId, fetch::http::DATA_FILE, object::Server, Version};
+use webar_core::{blob::BlobId, fetch::http::DATA_FILE, Server, Version};
 use webar_data::ser::Serialize;
 use webar_media_core::image::{
     fetcher::HttpRequest,
@@ -151,13 +151,8 @@ fn run<'a, S: ServerConfig>(root_path: &Path, server_path: &str, fetch_root: &st
     let blob_store =
         store::blob::store::WebsiteStore::open_at(&blob_base, server_root.as_fd(), c"store/blob")
             .context("failed to open website blob store")?;
-    let fetch = read_fetch(
-        S::SERVER.name,
-        fetch_root.as_fd(),
-        S::FETCH_TYPE,
-        &blob_store,
-    )
-    .context("failed to read fetch")?;
+    let fetch = read_fetch(&S::SERVER, fetch_root.as_fd(), S::FETCH_TYPE, &blob_store)
+        .context("failed to read fetch")?;
     let object_store = store::object::store::WebsiteStore::open_at(
         S::SERVER,
         S::instance_ref(&fetch.instance),

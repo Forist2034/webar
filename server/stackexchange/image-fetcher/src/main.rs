@@ -1,5 +1,6 @@
 use std::process::ExitCode;
 
+use webar_core::Server;
 use webar_image_fetcher::ServerConfig;
 use webar_stackexchange_core::{
     image::source::ArchiveImage,
@@ -12,7 +13,7 @@ impl ServerConfig for ServerCfg {
     type FetchType = FetchType;
     type Id = ArchiveImage<String>;
 
-    const SERVER: &'static str = SERVER.name;
+    const SERVER: Server<&'static str> = SERVER;
     const FETCH_TYPE: Self::FetchType = FetchType::Image;
 }
 

@@ -17,41 +17,21 @@
 --
 --  [@snapshot@]: one fetched data of a @archive@
 module Webar.Object
-  ( Server (..),
-    ObjectId (..),
+  ( ObjectId (..),
     ObjectType (..),
     ObjectInfo (..),
     encodeObject,
   )
 where
 
-import Codec.CBOR.Decoding (decodeListLenCanonicalOf, decodeStringCanonical)
-import Codec.CBOR.Encoding
 import qualified Codec.CBOR.Encoding as Cbor
 import qualified Codec.CBOR.Write as Cbor
 import Data.ByteString (ByteString)
-import Data.Text (Text)
 import Webar.Data.Cbor (FromCbor (..), ToCbor (..))
 import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
 import Webar.Digest
-import Webar.Types (Version)
-
-data Server = Server
-  { serverName :: {-# UNPACK #-} Text,
-    serverVersion :: {-# UNPACK #-} Version
-  }
-  deriving (Show, Eq)
-
-instance ToCbor Server where
-  toCbor s =
-    encodeListLen 2
-      <> (encodeString (serverName s) <> toCbor (serverVersion s))
-
-instance FromCbor Server where
-  fromCbor =
-    decodeListLenCanonicalOf 2
-      >> Server <$> decodeStringCanonical <*> fromCbor
+import Webar.Types (Server, Version)
 
 newtype ObjectId t = ObjectId Digest
   deriving (Show, Eq, Ord, FromCbor, ToCbor, FromJSON, ToJSON)

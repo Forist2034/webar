@@ -12,7 +12,6 @@ import Control.Exception (Exception, bracket, throwIO)
 import Control.Monad (unless)
 import qualified Data.ByteString as BS
 import Data.Data (Typeable)
-import Data.Text (Text)
 import System.FilePath ((</>))
 import System.IO
 import qualified System.Posix as P.FilePath
@@ -24,7 +23,7 @@ import Webar.Fetch
 import Webar.Fetch.Http
 import Webar.Fetch.Http.Internal
 import qualified Webar.Store.Blob.WithShared as BS
-import Webar.Types (Version (Version))
+import Webar.Types (Server, Version (Version))
 
 data Fetch i l = Fetch
   { fInstance :: i,
@@ -40,7 +39,7 @@ hashFile dirFd p =
     (fmap DigestField . hashHandle)
 
 data MetaException t
-  = ServerMismatch Text
+  = ServerMismatch Server
   | UnsupportedVersion Version
   | IncorrectType t
   deriving (Show)
@@ -50,7 +49,7 @@ instance (Show t, Typeable t) => Exception (MetaException t)
 readFetch ::
   forall i t l.
   (FromCbor i, FromCbor t, Show t, Eq t, Typeable t, FromCbor l) =>
-  Text ->
+  Server ->
   t ->
   FilePath ->
   IO (Fetch i l)
@@ -100,7 +99,7 @@ withFetch ::
   forall i t l c.
   (FromCbor i, Show t, Eq t, Typeable t, FromCbor t, FromCbor l) =>
   BS.BlobStore ->
-  Text ->
+  Server ->
   t ->
   FilePath ->
   (Fetch i l -> IO c) ->

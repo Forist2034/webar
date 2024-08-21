@@ -2,7 +2,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use webar_core::object::Server;
+use webar_core::Server;
 use webar_image_add_fetch::ServerConfig;
 use webar_stackexchange_core::{
     image::source::RequestRecord,

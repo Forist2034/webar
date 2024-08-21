@@ -5,8 +5,8 @@ use serde::de::DeserializeOwned;
 
 use webar_core::{
     digest::Digest,
-    object::{encode_object, ObjectId, ObjectInfo, Server},
-    Version,
+    object::{encode_object, ObjectId, ObjectInfo},
+    Server, Version,
 };
 use webar_data::ser::{Never, Serialize};
 use webar_media_core::image::fetcher::ImageSpec;

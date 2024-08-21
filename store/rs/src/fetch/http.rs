@@ -20,7 +20,7 @@ use webar_core::{
         },
         FetchMeta, META_FILE,
     },
-    Version,
+    Server, Version,
 };
 
 use crate::{blob, perm};
@@ -76,7 +76,7 @@ enum InnerError<T> {
     #[error("failed to decode metadata")]
     Decode(#[source] ciborium::de::Error<std::io::Error>),
     #[error("unexpected server name {0:?}")]
-    ServerMismatch(String),
+    ServerMismatch(Server<String>),
     #[error("unsupported version {0}")]
     UnsupportedVersion(Version),
     #[error("incorrect type {0:?}")]
@@ -94,7 +94,7 @@ pub struct Fetch<I, L> {
 }
 
 fn read_fetch_inner<T, I, L>(
-    server: &'static str,
+    server: &Server<&str>,
     root: BorrowedFd,
     ty: T,
 ) -> Result<Fetch<I, L>, InnerError<T>>
@@ -106,13 +106,13 @@ where
     let fetch_meta: FetchMeta<String, I, T, Metadata<L>> =
         ciborium::from_reader(read_file(root, META_FILE.c_path)?.as_slice())
             .map_err(InnerError::Decode)?;
-    if fetch_meta.server != server {
+    if fetch_meta.server.name != server.name || fetch_meta.server.version != server.version {
         return Err(InnerError::ServerMismatch(fetch_meta.server));
     }
     if fetch_meta.ty != ty {
         return Err(InnerError::IncorrectType(fetch_meta.ty));
     }
-    if fetch_meta.version.0 != 1 || fetch_meta.version.1 != 0 {
+    if fetch_meta.version != Version(1, 0) {
         return Err(InnerError::UnsupportedVersion(fetch_meta.version));
     }
     let meta = fetch_meta.data;
@@ -147,7 +147,7 @@ where
 }
 
 pub fn read_fetch<T, I: DeserializeOwned, L: DeserializeOwned>(
-    server: &'static str,
+    server: &Server<&str>,
     root: BorrowedFd,
     ty: T,
     _: &blob::WebsiteStore,

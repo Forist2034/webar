@@ -42,6 +42,21 @@ impl Display for Version {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub struct Server<N> {
+    pub name: N,
+    pub version: Version,
+}
+impl<N: Serialize> Serialize for Server<N> {
+    fn serialize<S: webar_data::ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use webar_data::ser::SerializeTupleStruct;
+        let mut ser = serializer.serialize_tuple_struct(2)?;
+        ser.serialize_field(&self.name)?;
+        ser.serialize_field(&self.version)?;
+        ser.end()
+    }
+}
+
 pub struct FilePath {
     pub path: &'static str,
     pub c_path: &'static std::ffi::CStr,

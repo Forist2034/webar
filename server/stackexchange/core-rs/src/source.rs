@@ -1,6 +1,6 @@
 use serde::Deserialize;
 
-use webar_core::{object::Server, Version};
+use webar_core::{Server, Version};
 use webar_data::ser::Serialize;
 
 use crate::image;

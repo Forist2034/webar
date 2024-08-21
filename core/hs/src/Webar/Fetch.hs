@@ -2,9 +2,8 @@
 
 module Webar.Fetch where
 
-import Data.Text (Text)
-import Webar.Data.TH
-import Webar.Types (Version)
+import Webar.Data.Cbor.TH
+import Webar.Types (Server, Version)
 
 -- | fetch metadata
 --
@@ -14,7 +13,7 @@ import Webar.Types (Version)
 --
 --     * detect errors like incompatible version or type mismatch
 data FetchMeta i t d = FetchMeta
-  { fmServer :: Text,
+  { fmServer :: Server,
     fmInstance :: i,
     fmType :: t,
     fmVersion :: Version,
@@ -22,7 +21,7 @@ data FetchMeta i t d = FetchMeta
   }
   deriving (Show)
 
-deriveProdData
+deriveProdCbor
   defaultProductOptions
     { fieldLabelModifier = camelTo2 '_' . drop 2,
       sortFields = False

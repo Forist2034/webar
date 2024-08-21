@@ -22,7 +22,6 @@ library
     ghc-options:        -Wall
     build-depends:
         base ^>=4.18.2.1,
-        text >=2.0.2 && <2.1,
         bytestring >=0.11.5 && <0.12,
         filepath >=1.4 && <1.6,
         unix >=2.8.4 && <2.9,

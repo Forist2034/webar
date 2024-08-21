@@ -14,7 +14,7 @@ struct Args {
 
 struct ServerCfg;
 impl ServerConfig for ServerCfg {
-    const SERVER: webar_core::object::Server<&'static str> = source::SERVER;
+    const SERVER: webar_core::Server<&'static str> = source::SERVER;
 
     type ImageId = image::source::ArchiveImage<String>;
     type Instance = source::Instance;

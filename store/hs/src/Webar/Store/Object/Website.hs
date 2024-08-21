@@ -10,7 +10,7 @@ where
 import Webar.Data.Cbor (ToCbor)
 import Webar.Object
 import qualified Webar.Store.Object.Base as OS
-import Webar.Types (Version)
+import Webar.Types (Server, Version)
 
 data ObjectStore h a st rt = ObjectStore
   { storeServer :: !Server,

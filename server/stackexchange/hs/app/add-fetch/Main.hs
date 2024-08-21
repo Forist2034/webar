@@ -539,7 +539,7 @@ main = do
       ( \ds ->
           withFetch @() @FetchType @()
             ds
-            (serverName server)
+            server
             FtRestApi
             args.argFetchRoot
             ( \f ->
