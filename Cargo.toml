@@ -7,6 +7,7 @@ members = [
   "./store/rs",
   "./utils/rs/rustls",
   "./utils/rs/tracing",
+  "fetcher/traffic",
   "./media/core-rs",
   "./media/image/store-rs",
   "./media/image/fetcher",
@@ -54,6 +55,7 @@ webar-core = { path = "./core/rs" }
 webar-tracing = { path = "./utils/rs/tracing" }
 webar-rustls = { path = "./utils/rs/rustls" }
 webar-store = { path = "./store/rs" }
+webar-traffic-capture = { path = "./fetcher/traffic" }
 webar-media-core = { path = "./media/core-rs" }
 webar-image-store = { path = "./media/image/store-rs" }
 webar-image-fetcher = { path = "./media/image/fetcher" }

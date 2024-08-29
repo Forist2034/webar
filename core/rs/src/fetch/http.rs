@@ -122,6 +122,10 @@ pub const WIRESHARK_DATA_FILE: FilePath = FilePath {
     path: "traffic.pcapng",
     c_path: c"traffic.pcapng",
 };
+pub const WIRESHARK_LOG_FILE: FilePath = FilePath {
+    path: "dumpcap.log",
+    c_path: c"dumpcap.log",
+};
 
 pub const REQUEST_META_FILE: FilePath = FilePath {
     path: "request_meta.tar",

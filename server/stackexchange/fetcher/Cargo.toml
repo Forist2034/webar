@@ -27,3 +27,4 @@ reqwest = { workspace = true, features = ["http2", "rustls-tls-manual-roots"] }
 rustix.workspace = true
 webar-rustls.workspace = true
 webar-tracing.workspace = true
+webar-traffic-capture.workspace = true

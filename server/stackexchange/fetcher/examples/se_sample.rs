@@ -4,13 +4,12 @@ use std::{
     io::{self, Write},
     num::NonZeroUsize,
     ops::Deref,
-    path::{Path, PathBuf},
     process::ExitCode,
 };
 
 use anyhow::Context;
 use rustix::{
-    fd::{AsFd, BorrowedFd, OwnedFd},
+    fd::{AsFd, BorrowedFd},
     fs::{Mode, OFlags},
 };
 use webar_core::{
@@ -45,14 +44,6 @@ fn open(root: BorrowedFd<'_>, name: &CStr) -> Result<std::fs::File, rustix::io::
         Mode::from_raw_mode(0o644), // for sample only, set file to readonly when using
     )
     .map(std::fs::File::from)
-}
-
-fn init(sink_path: &Path) -> anyhow::Result<OwnedFd> {
-    let root = rustix::fs::open(sink_path, OFlags::PATH, Mode::all())
-        .context("failed to open dest dir")?;
-    webar_tracing::init(open(root.as_fd(), LOG_FILE.c_path).context("failed to open log file")?)
-        .context("failed to init tracing log")?;
-    Ok(root)
 }
 
 fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
@@ -246,6 +237,20 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn inner_main(root: BorrowedFd, full: bool) -> anyhow::Result<()> {
+    webar_rustls::global_init();
+    webar_tracing::init(open(root.as_fd(), LOG_FILE.c_path).context("failed to open log file")?)
+        .context("failed to init tracing log")?;
+    let _span = tracing::info_span!("stackexchange", webar.root = true).entered();
+    match run(full, root.as_fd()) {
+        Ok(()) => Ok(()),
+        Err(err) => {
+            tracing::error!(err = err.deref(), "failed to fetch data");
+            Err(err)
+        }
+    }
+}
+
 pub fn main() -> ExitCode {
     let (full, sink_path) = {
         let mut a = args();
@@ -256,23 +261,11 @@ pub fn main() -> ExitCode {
                 "full" => true,
                 _ => panic!("invalid fetch data"),
             },
-            PathBuf::from(a.next().expect("missing sink path")),
+            a.next().expect("missing sink path"),
         )
     };
-    webar_rustls::global_init();
-    let root = match init(sink_path.as_path()) {
-        Ok(r) => r,
-        Err(e) => {
-            eprintln!("{e:?}");
-            return ExitCode::FAILURE;
-        }
-    };
-    let _span = tracing::info_span!("stackexchange", webar.root = true).entered();
-    match run(full, root.as_fd()) {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(e) => {
-            tracing::error!(err = e.deref(), "failed to fetch data");
-            ExitCode::FAILURE
-        }
+
+    unsafe {
+        webar_traffic_capture::dumpcap_main(sink_path.as_str(), |root| inner_main(root, full))
     }
 }
