@@ -19,6 +19,9 @@ members = [
   "server/stackexchange/image-fetcher",
   "server/stackexchange/add-image-fetch",
   "server/stackexchange/filter-image-src",
+  "./server/wordpress/core-rs",
+  "./server/wordpress/fetcher",
+  "server/wordpress/fetcher-bin",
 ]
 
 
@@ -63,3 +66,5 @@ webar-image-add-fetch = { path = "media/image/add-fetch" }
 webar-image-filter-source = { path = "media/image/filter-source" }
 webar-stackexchange-core = { path = "./server/stackexchange/core-rs" }
 webar-stackexchange-fetcher = { path = "./server/stackexchange/fetcher" }
+webar-wordpress-core = { path = "./server/wordpress/core-rs" }
+webar-wordpress-fetcher = { path = "./server/wordpress/fetcher" }

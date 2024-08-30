@@ -164,6 +164,21 @@ impl From<http::HeaderMap<http::HeaderValue>> for HeaderMap<HeaderValue> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RequestId {
+    #[serde(rename = "x-request-id")]
+    /// `x-request-id` header
+    XRequestId(uuid::Uuid),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestMeta<I, B> {
+    pub id: I,
+    pub timestamp: Timestamp,
+    /// metadata of body
+    pub body: B,
+}
+
 /** http request
 
   Request headers is not included because it is difficult to
@@ -177,6 +192,12 @@ pub struct Request<I, U, B> {
     pub url: U,
     pub timestamp: Timestamp,
     pub body: B,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponseMeta<I> {
+    pub id: I,
+    pub timestamp: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

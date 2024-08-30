@@ -61,3 +61,19 @@ pub struct FilePath {
     pub path: &'static str,
     pub c_path: &'static std::ffi::CStr,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Domain<D>(pub D);
+impl<D: Display> Display for Domain<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+// TODO: support ip address when ip addr serialize is implemented
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Host<S> {
+    #[serde(rename = "domain")]
+    Domain(Domain<S>),
+}
