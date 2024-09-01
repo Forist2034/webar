@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Webar.Http
@@ -7,6 +8,7 @@ module Webar.Http
     Method,
     HeaderMap,
     JsonBody (..),
+    RequestId (..),
     Request (..),
     Response (..),
   )
@@ -19,12 +21,14 @@ import Codec.CBOR.Encoding
 import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.Text (Text)
+import Data.UUID.Types (UUID)
 import qualified Data.Vector as V
 import Data.Word (Word16)
 import Webar.Blob.Internal (BlobData)
 import Webar.Bytes (ByteBuffer)
 import Webar.Data.Cbor (FromCbor (..), ToCbor (..))
 import Webar.Data.Cbor.TH
+import Webar.Data.TH (deriveSumData)
 import Webar.Types (Timestamp)
 
 newtype StatusCode = StatusCode Word16
@@ -83,6 +87,13 @@ newtype JsonBody = JsonBody {jsonBody :: ByteString}
 
 instance BlobData JsonBody
 
+newtype RequestId = ReqXRequestId UUID
+  deriving (Show, Eq)
+
+deriveSumData
+  defaultSumOptions {constructorTagModifier = camelTo2 '-' . drop 3}
+  ''RequestId
+
 data Request i b = Request
   { reqId :: i,
     reqMethod :: Method,
@@ -93,7 +104,7 @@ data Request i b = Request
   deriving (Show)
 
 deriveProdCbor
-  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
+  defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 3}
   ''Request
 
 data Response i b = Response
