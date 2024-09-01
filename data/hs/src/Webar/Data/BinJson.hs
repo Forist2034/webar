@@ -30,6 +30,7 @@ data Field = !K.Key := !BinValue
 data Number
   = NInt {-# UNPACK #-} !Int64
   | NWord {-# UNPACK #-} !Word64
+  | NScientific !Integer !Int
   deriving (Show, Eq)
 
 data BinValue
@@ -48,6 +49,10 @@ instance ToCbor BinValue where
   toCbor (JNumber n) = case n of
     NInt i -> encodeInt64 i
     NWord w -> encodeWord64 w
+    NScientific v e ->
+      encodeTag 4
+        <> encodeListLen 2
+        <> (encodeInt e <> encodeInteger v)
   toCbor (JArray v) =
     encodeListLen (fromIntegral (V.length v))
       <> V.foldMap' toCbor v
@@ -71,6 +76,14 @@ instance FromCbor BinValue where
       TypeMapLen ->
         decodeMapLenCanonical >>= \l ->
           JObject . V.fromListN l <$> goObj l
+      TypeTag ->
+        decodeTagCanonical >>= \case
+          4 ->
+            decodeListLenCanonicalOf 2 >> do
+              e <- decodeInt
+              m <- decodeInteger
+              pure (JNumber (NScientific m e))
+          _ -> fail "invalid tag"
       _ -> fail "invalid type"
     where
       decodeIntNum = JNumber . NInt <$> decodeInt64Canonical
@@ -89,6 +102,7 @@ encodeJson JNull = Enc.null_
 encodeJson (JNumber n) = case n of
   NInt i -> Enc.int64 i
   NWord w -> Enc.word64 w
+  NScientific m e -> Enc.scientific (Sci.scientific m e)
 encodeJson (JArray a) =
   Enc.list encodeJson (V.toList a)
 encodeJson (JObject fs) =
@@ -106,6 +120,7 @@ instance Aeson.ToJSON BinValue where
       ( case n of
           NInt i -> fromIntegral i
           NWord w -> fromIntegral w
+          NScientific m e -> Sci.scientific m e
       )
   toJSON (JArray a) = Aeson.Array (V.map Aeson.toJSON a)
   toJSON (JObject fs) =
@@ -127,7 +142,16 @@ instance Aeson.FromJSON BinValue where
         pure (JNumber (NInt i))
     | Just i <- Sci.toBoundedInteger @Word64 sci =
         pure (JNumber (NWord i))
-    | otherwise = fail "expect 64 bit signed or unsigned integer"
+    | Sci.isFloating sci =
+        let norm = Sci.normalize sci
+         in pure
+              ( JNumber
+                  ( NScientific
+                      (Sci.coefficient norm)
+                      (Sci.base10Exponent norm)
+                  )
+              )
+    | otherwise = fail "integer greater than 64 bit is not supported"
   parseJSON (Aeson.Array a) =
     JArray
       <$> V.imapM
