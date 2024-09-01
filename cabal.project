@@ -4,3 +4,4 @@ packages:
   ./store/hs/webar-store.cabal
   ./media/hs/webar-media.cabal
   ./server/stackexchange/hs/webar-stackexchange.cabal
+  ./server/wordpress/hs/webar-wordpress.cabal
