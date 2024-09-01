@@ -1,12 +1,23 @@
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Webar.Types where
+module Webar.Types
+  ( Timestamp (..),
+    Version (..),
+    Server (..),
+    Domain,
+    domainText,
+    Host (..),
+  )
+where
 
 import Codec.CBOR.Decoding (decodeListLenCanonicalOf, decodeStringCanonical)
 import Codec.CBOR.Encoding
 import Data.Text (Text)
 import Data.Word (Word32, Word64, Word8)
 import Webar.Data.Cbor
+import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
 
 data Timestamp = Timestamp
@@ -40,3 +51,15 @@ instance FromCbor Server where
   fromCbor =
     decodeListLenCanonicalOf 2
       >> Server <$> decodeStringCanonical <*> fromCbor
+
+newtype Domain = Domain {domainText :: Text}
+  deriving (Show, Eq, FromCbor, ToCbor, FromJSON, ToJSON)
+
+newtype Host = HDomain Domain
+  deriving (Show, Eq)
+
+deriveSumData
+  defaultSumOptions
+    { constructorTagModifier = camelTo2 '_' . tail
+    }
+  ''Host
