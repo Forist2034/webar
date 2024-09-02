@@ -6,7 +6,7 @@
 module Webar.Fetch.Http
   ( KeyLogId,
     WiresharkDataId,
-    LogId,
+    TracingLogId,
     RequestMetaId,
     FetchDataId,
     idToDigest,
@@ -29,7 +29,7 @@ type WiresharkDataId = DigestField WiresharkData
 
 type DumpcapLogId = DigestField DumpcapLog
 
-type LogId = DigestField Log
+type TracingLogId = DigestField TracingLog
 
 type RequestMetaId = DigestField RequestMeta
 
@@ -81,7 +81,7 @@ deriveProdData
 data FetchInfo l = FetchInfo
   { tiStartTime :: Timestamp,
     tiEndTime :: Timestamp,
-    tiLog :: LogId,
+    tiTracingLog :: TracingLogId,
     tiUser :: l,
     tiTraffic :: Traffic
   }

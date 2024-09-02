@@ -63,7 +63,7 @@ readFetch server ty p = do
     (P.FilePath.openFd p P.FilePath.ReadOnly P.FilePath.defaultFileFlags)
     P.FilePath.closeFd
     ( \fd -> do
-        logFile <- hashFile fd "log.bin"
+        logFile <- hashFile fd "tracing.log.bin"
         dataFile <- P.openFdAt (Just fd) "data.tar" P.ReadOnly P.defaultFileFlags >>= P.fdToHandle
         traffic <- case metaTraffic meta of
           Just TtWireshark -> do
@@ -91,7 +91,7 @@ readFetch server ty p = do
                     tiEndTime = metaEndTime meta,
                     tiUser = metaUser meta,
                     tiTraffic = traffic,
-                    tiLog = logFile
+                    tiTracingLog = logFile
                   },
               fData = dataFile
             }

@@ -16,7 +16,8 @@ use webar_core::{
     fetch::{
         http::{
             internal::DigestField, FetchInfo, Metadata, Traffic, TrafficType, DATA_FILE,
-            KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE, WIRESHARK_DATA_FILE, WIRESHARK_LOG_FILE,
+            KEY_LOG_FILE, REQUEST_META_FILE, TRACING_LOG_FILE, WIRESHARK_DATA_FILE,
+            WIRESHARK_LOG_FILE,
         },
         FetchMeta, META_FILE,
     },
@@ -139,7 +140,7 @@ where
         info: FetchInfo {
             start_time: meta.start_time,
             end_time: meta.end_time,
-            log: hash_file(root, LOG_FILE.c_path)?,
+            log: hash_file(root, TRACING_LOG_FILE.c_path)?,
             user: meta.user,
             traffic,
         },

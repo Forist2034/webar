@@ -14,7 +14,7 @@ use webar_core::{
     blob::{BlobId, ImageData},
     digest::Digest,
     fetch::{
-        http::{Metadata, LOG_FILE},
+        http::{Metadata, TRACING_LOG_FILE},
         FetchMeta, META_FILE,
     },
     http, Server, Timestamp, Version,
@@ -143,7 +143,7 @@ fn open(root: BorrowedFd, path: &CStr) -> Result<std::fs::File> {
 
 fn init(path: &str) -> Result<OwnedFd> {
     let root = fs::open(path, OFlags::PATH, Mode::empty()).context("failed to open dest dir")?;
-    webar_tracing::init(open(root.as_fd(), LOG_FILE.c_path).context("failed to open log")?)
+    webar_tracing::init(open(root.as_fd(), TRACING_LOG_FILE.c_path).context("failed to open log")?)
         .context("failed to init tracing")?;
     Ok(root)
 }

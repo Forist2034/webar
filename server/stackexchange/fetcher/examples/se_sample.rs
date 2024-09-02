@@ -14,7 +14,7 @@ use rustix::{
 };
 use webar_core::{
     fetch::{
-        http::{Metadata, KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE},
+        http::{Metadata, KEY_LOG_FILE, REQUEST_META_FILE, TRACING_LOG_FILE},
         FetchMeta, META_FILE,
     },
     Timestamp, Version,
@@ -239,8 +239,10 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
 
 fn inner_main(root: BorrowedFd, full: bool) -> anyhow::Result<()> {
     webar_rustls::global_init();
-    webar_tracing::init(open(root.as_fd(), LOG_FILE.c_path).context("failed to open log file")?)
-        .context("failed to init tracing log")?;
+    webar_tracing::init(
+        open(root.as_fd(), TRACING_LOG_FILE.c_path).context("failed to open log file")?,
+    )
+    .context("failed to init tracing log")?;
     let _span = tracing::info_span!("stackexchange", webar.root = true).entered();
     match run(full, root.as_fd()) {
         Ok(()) => Ok(()),

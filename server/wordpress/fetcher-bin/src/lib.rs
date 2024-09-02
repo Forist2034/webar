@@ -13,7 +13,9 @@ use rustix::{
 
 use webar_core::{
     fetch::{
-        http::{Metadata, TrafficType, DATA_FILE, KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE},
+        http::{
+            Metadata, TrafficType, DATA_FILE, KEY_LOG_FILE, REQUEST_META_FILE, TRACING_LOG_FILE,
+        },
         FetchMeta, META_FILE,
     },
     Timestamp, Version,
@@ -104,7 +106,7 @@ fn inner_main(
     f: impl FnOnce(&mut Fetcher<FileWriter, FileWriter>) -> Result<()>,
 ) -> Result<()> {
     webar_rustls::global_init();
-    webar_tracing::init(open(root, LOG_FILE.c_path).context("failed to open log file")?)
+    webar_tracing::init(open(root, TRACING_LOG_FILE.c_path).context("failed to open log file")?)
         .context("failed to init tracing")?;
     let _span = tracing::info_span!(
         "wordpress",

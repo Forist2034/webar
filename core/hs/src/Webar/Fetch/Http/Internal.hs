@@ -8,7 +8,7 @@ import Webar.Digest (Digest)
 
 data KeyLog
 
-data Log
+data TracingLog
 
 data WiresharkData
 

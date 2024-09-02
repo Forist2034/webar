@@ -113,9 +113,9 @@ pub struct Metadata<L> {
     pub user: L,
 }
 
-pub const LOG_FILE: FilePath = FilePath {
-    path: "log.bin",
-    c_path: c"log.bin",
+pub const TRACING_LOG_FILE: FilePath = FilePath {
+    path: "tracing.log.bin",
+    c_path: c"tracing.log.bin",
 };
 
 pub const KEY_LOG_FILE: FilePath = FilePath {
