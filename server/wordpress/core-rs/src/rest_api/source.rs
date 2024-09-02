@@ -3,7 +3,9 @@ use serde::Deserialize;
 use webar_core::http;
 use webar_data::ser::Serialize;
 
-use crate::id::{PageId, PostId};
+use crate::id::{
+    CategoryId, CommentId, MediaId, PageId, PageRevisionId, PostId, PostRevisionId, TagId, UserId,
+};
 
 macro_rules! archive {
     (enum $i:ident { $($r:ident = $v:literal,)+ }) => {
@@ -12,6 +14,34 @@ macro_rules! archive {
             $(#[serde(rename=$v)] $r,)+
         }
     };
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArchiveBlogNode {
+    #[serde(rename = "category")]
+    Category(CategoryId),
+    #[serde(rename = "comment")]
+    Comment(CommentId),
+    #[serde(rename = "media")]
+    Media(MediaId),
+    #[serde(rename = "page")]
+    Page(PageId),
+    #[serde(rename = "page_revision")]
+    PageRevision(PageId, PageRevisionId),
+    #[serde(rename = "post")]
+    Post(PostId),
+    #[serde(rename = "post_revision")]
+    PostRevision(PostId, PostRevisionId),
+    #[serde(rename = "tag")]
+    Tag(TagId),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArchiveNode<Addr> {
+    #[serde(rename = "blog")]
+    Blog(Addr, ArchiveBlogNode),
+    #[serde(rename = "user")]
+    User(UserId),
 }
 
 archive!(
@@ -64,32 +94,12 @@ pub use http::RequestId;
 pub type Request<U> = http::Request<RequestId, U, ()>;
 pub type Response<B> = http::Response<(), http::HeaderMap<http::HeaderValue>, B>;
 
-archive!(
-    enum NodeTypeBlog {
-        Category = "category",
-        Comment = "comment",
-        Media = "media",
-        Page = "page",
-        PageRevision = "page_revision",
-        Post = "post",
-        PostRevision = "post_revision",
-        Tag = "tag",
-    }
-);
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum NodeType<Addr> {
-    #[serde(rename = "blog")]
-    Blog(Addr, NodeTypeBlog),
-    #[serde(rename = "user")]
-    User,
-}
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ResponseData<Addr, R> {
     #[serde(rename = "node")]
     Node {
         #[serde(rename = "type")]
-        ty: NodeType<Addr>,
+        ty: ArchiveNode<Addr>,
         response: R,
     },
     #[serde(rename = "edge")]

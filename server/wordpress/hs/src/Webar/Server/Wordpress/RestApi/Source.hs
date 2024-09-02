@@ -26,8 +26,6 @@ module Webar.Server.Wordpress.RestApi.Source
     HttpInfo (..),
 
     -- ** api response
-    NodeTypeBlog (..),
-    NodeType (..),
     ResponseData (..),
     ApiResponseInfo (..),
 
@@ -153,33 +151,10 @@ deriveProdCbor
   defaultProductOptions {fieldLabelModifier = camelTo2 '_' . drop 2}
   ''HttpInfo
 
-data NodeTypeBlog
-  = NtCategory
-  | NtComment
-  | NtMedia
-  | NtPage
-  | NtPageRevision
-  | NtPost
-  | NtPostRevision
-  | NtTag
-  deriving (Show, Eq)
-
-deriveSumData
-  defaultSumOptions {constructorTagModifier = camelTo2 '_' . drop 2}
-  ''NodeTypeBlog
-
-data NodeType
-  = NtBlog Address NodeTypeBlog
-  | NtUser
-  deriving (Show, Eq)
-
-deriveSumData
-  defaultSumOptions {constructorTagModifier = camelTo2 '_' . drop 2}
-  ''NodeType
-
 data ResponseData r
   = RdNode
-      { rdnType :: NodeType,
+      { -- | record node id so failed request can be recorded (e.g. deleted node)
+        rdnType :: ArchiveNode,
         rdnResponse :: r
       }
   | RdEdge

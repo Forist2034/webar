@@ -14,8 +14,8 @@ use webar_wordpress_core::{
     rest_api::{
         model, source,
         source::{
-            ArchiveBlogCollection, ArchiveBlogEdge, ArchiveCollection, ArchiveEdge,
-            ArchivePageEdge, ArchivePostEdge, NodeType, NodeTypeBlog,
+            ArchiveBlogCollection, ArchiveBlogEdge, ArchiveBlogNode, ArchiveCollection,
+            ArchiveEdge, ArchiveNode, ArchivePageEdge, ArchivePostEdge,
         },
         ApiInfo, ApiVersion,
     },
@@ -114,7 +114,7 @@ pub(crate) enum PageType<'s, 'a> {
     Collection(ArchiveCollection<&'a StrAddr<'s>>),
 }
 pub struct NodeReq<'s, 'a, O> {
-    pub(crate) ty: NodeType<&'a StrAddr<'s>>,
+    pub(crate) ty: ArchiveNode<&'a StrAddr<'s>>,
     url: Url,
     _phantom: PhantomData<fn() -> O>,
 }
@@ -162,11 +162,11 @@ pub struct PageHandler<'s, 'h> {
 impl<'s> Handler<'s> {
     fn blog_node_req<'h, O>(
         &'h self,
-        ty: NodeTypeBlog,
+        ty: ArchiveBlogNode,
         route: fmt::Arguments,
     ) -> NodeReq<'s, 'h, O> {
         NodeReq {
-            ty: NodeType::Blog(&self.blog, ty),
+            ty: ArchiveNode::Blog(&self.blog, ty),
             url: self.api_base.format_url(route),
             _phantom: PhantomData,
         }
@@ -198,21 +198,24 @@ impl<'s> Handler<'s> {
     }
 
     pub fn get_category<'h>(&'h self, id: CategoryId) -> NodeReq<'s, 'h, model::Category> {
-        self.blog_node_req(NodeTypeBlog::Category, format_args!("/categories/{id}"))
+        self.blog_node_req(
+            ArchiveBlogNode::Category(id),
+            format_args!("/categories/{id}"),
+        )
     }
     pub fn list_categories<'h>(&'h self) -> PageReq<'s, 'h, model::Category> {
         self.blog_collection_req(ArchiveBlogCollection::Category, "/categories")
     }
 
     pub fn get_comment<'h>(&'h self, id: CommentId) -> NodeReq<'s, 'h, model::Comment> {
-        self.blog_node_req(NodeTypeBlog::Comment, format_args!("/comments/{id}"))
+        self.blog_node_req(ArchiveBlogNode::Comment(id), format_args!("/comments/{id}"))
     }
     pub fn list_comments<'h>(&'h self) -> PageReq<'s, 'h, model::Comment> {
         self.blog_collection_req(ArchiveBlogCollection::Comment, "/comments")
     }
 
     pub fn get_media<'h>(&'h self, id: MediaId) -> NodeReq<'s, 'h, model::Media> {
-        self.blog_node_req(NodeTypeBlog::Media, format_args!("/media/{id}"))
+        self.blog_node_req(ArchiveBlogNode::Media(id), format_args!("/media/{id}"))
     }
     pub fn list_media<'h>(&'h self) -> PageReq<'s, 'h, model::Media> {
         self.blog_collection_req(ArchiveBlogCollection::Media, "/media")
@@ -233,7 +236,7 @@ impl<'s> Handler<'s> {
     }
 
     pub fn get_tag<'h>(&'h self, id: TagId) -> NodeReq<'s, 'h, model::Tag> {
-        self.blog_node_req(NodeTypeBlog::Tag, format_args!("/tags/{id}"))
+        self.blog_node_req(ArchiveBlogNode::Tag(id), format_args!("/tags/{id}"))
     }
     pub fn list_tags<'h>(&'h self) -> PageReq<'s, 'h, model::Tag> {
         self.blog_collection_req(ArchiveBlogCollection::Tag, "/tags")
@@ -241,7 +244,7 @@ impl<'s> Handler<'s> {
 
     pub fn get_user<'h>(&'h self, id: UserId) -> NodeReq<'s, 'h, model::User> {
         NodeReq {
-            ty: NodeType::User,
+            ty: ArchiveNode::User(id),
             url: self.api_base.format_url(format_args!("/users/{id}")),
             _phantom: PhantomData,
         }
@@ -257,12 +260,14 @@ impl<'s> Handler<'s> {
 }
 impl<'s, 'h> PageHandler<'s, 'h> {
     pub fn get(&self) -> NodeReq<'s, 'h, model::Page> {
-        self.handler
-            .blog_node_req(NodeTypeBlog::Page, format_args!("/pages/{}", self.id))
+        self.handler.blog_node_req(
+            ArchiveBlogNode::Page(self.id),
+            format_args!("/pages/{}", self.id),
+        )
     }
     pub fn get_revision(&self, rev_id: PageRevisionId) -> NodeReq<'s, 'h, model::PageRevision> {
         self.handler.blog_node_req(
-            NodeTypeBlog::PageRevision,
+            ArchiveBlogNode::PageRevision(self.id, rev_id),
             format_args!("/pages/{}/revisions/{rev_id}", self.id),
         )
     }
@@ -276,12 +281,14 @@ impl<'s, 'h> PageHandler<'s, 'h> {
 }
 impl<'s, 'h> PostHandler<'s, 'h> {
     pub fn get(&self) -> NodeReq<'s, 'h, model::Post> {
-        self.handler
-            .blog_node_req(NodeTypeBlog::Post, format_args!("/posts/{}", self.id))
+        self.handler.blog_node_req(
+            ArchiveBlogNode::Post(self.id),
+            format_args!("/posts/{}", self.id),
+        )
     }
     pub fn get_revision(&self, rev_id: PostRevisionId) -> NodeReq<'s, 'h, model::PostRevision> {
         self.handler.blog_node_req(
-            NodeTypeBlog::PostRevision,
+            ArchiveBlogNode::PostRevision(self.id, rev_id),
             format_args!("/posts/{}/revisions/{rev_id}", self.id),
         )
     }

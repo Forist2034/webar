@@ -209,16 +209,16 @@ addNode :: (Node a) => Context -> NodeMeta -> Addr a -> BinJson.WithBinValue a -
 addNode ctx meta addr (BinJson.WithBinValue bv obj) =
   addArchiveNode ctx meta (archiveNode addr obj) bv
 
-data NodeResp a = NodeResp
+data NodeResp = NodeResp
   { nrMeta :: NodeMeta,
-    nrAddr :: a,
+    nrNode :: ArchiveNode,
     nrRequest :: HttpRequest
   }
 
-addNodeResp :: forall a. (Node a) => Context -> Proxy a -> NodeResp (Addr a) -> IO ()
+addNodeResp :: forall a. (Node a) => Context -> Proxy a -> NodeResp -> IO ()
 addNodeResp ctx _ resp =
-  Aeson.throwDecodeStrict resp.nrRequest.hrResponse.respBody.jsonBody
-    >>= addNode @a ctx resp.nrMeta resp.nrAddr
+  Aeson.throwDecodeStrict @(BinJson.WithBinValue a) resp.nrRequest.hrResponse.respBody.jsonBody
+    >>= \(BinJson.WithBinValue bv _) -> addArchiveNode ctx resp.nrMeta resp.nrNode bv
 
 data SetResp = SetResp
   { srMeta :: NodeMeta,
@@ -268,29 +268,31 @@ addEntry ctx bs =
                     Src.arResponse =
                       Src.RdNode {Src.rdnType = ty, Src.rdnResponse = hId}
                   }
-          let meta =
-                NodeMeta
-                  { nmApiResponseId = rId,
-                    nmApi = entry.arApi,
-                    nmTimestamp = timestamp
+          let nodeResp =
+                NodeResp
+                  { nrMeta =
+                      NodeMeta
+                        { nmApiResponseId = rId,
+                          nmApi = entry.arApi,
+                          nmTimestamp = timestamp
+                        },
+                    nrNode = ty,
+                    nrRequest = resp
                   }
+
           case ty of
-            NtBlog addr bt ->
-              let nodeResp = NodeResp {nrMeta = meta, nrAddr = addr, nrRequest = resp}
-               in case bt of
-                    NtCategory -> addNodeResp @Api.Category ctx Proxy nodeResp
-                    NtComment -> addNodeResp @Api.Comment ctx Proxy nodeResp
-                    NtMedia -> addNodeResp @Api.Media ctx Proxy nodeResp
-                    NtPage -> addNodeResp @Api.Page ctx Proxy nodeResp
-                    NtPageRevision -> addNodeResp @Api.PageRevision ctx Proxy nodeResp
-                    NtPost -> addNodeResp @Api.Post ctx Proxy nodeResp
-                    NtPostRevision -> addNodeResp @Api.PostRevision ctx Proxy nodeResp
-                    NtTag -> addNodeResp @Api.Tag ctx Proxy nodeResp
-            NtUser ->
-              addNodeResp @Api.User
-                ctx
-                Proxy
-                NodeResp {nrMeta = meta, nrAddr = (), nrRequest = resp}
+            AnBlog _ bt ->
+              case bt of
+                AnCategory _ -> addNodeResp @Api.Category ctx Proxy nodeResp
+                AnComment _ -> addNodeResp @Api.Comment ctx Proxy nodeResp
+                AnMedia _ -> addNodeResp @Api.Media ctx Proxy nodeResp
+                AnPage _ -> addNodeResp @Api.Page ctx Proxy nodeResp
+                AnPageRevision _ _ -> addNodeResp @Api.PageRevision ctx Proxy nodeResp
+                AnPost _ -> addNodeResp @Api.Post ctx Proxy nodeResp
+                AnPostRevision _ _ -> addNodeResp @Api.PostRevision ctx Proxy nodeResp
+                AnTag _ -> addNodeResp @Api.Tag ctx Proxy nodeResp
+            AnUser _ ->
+              addNodeResp @Api.User ctx Proxy nodeResp
         Src.RdEdge {Src.rdeType = ty, Src.rdeFull = full, Src.rdeResponses = resps} -> do
           let timestamp = (V.head resps).hrRequest.reqTimestamp
           rId <-
