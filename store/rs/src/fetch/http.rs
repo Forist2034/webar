@@ -16,7 +16,7 @@ use webar_core::{
     fetch::{
         http::{
             internal::DigestField, FetchInfo, Metadata, Traffic, TrafficType, DATA_FILE,
-            KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE, WIRESHARK_DATA_FILE,
+            KEY_LOG_FILE, LOG_FILE, REQUEST_META_FILE, WIRESHARK_DATA_FILE, WIRESHARK_LOG_FILE,
         },
         FetchMeta, META_FILE,
     },
@@ -125,6 +125,7 @@ where
         Some(TrafficType::Wireshark) => Traffic::Wireshark {
             key_log: hash_file(root, KEY_LOG_FILE.c_path)?,
             request_meta: hash_file(root, REQUEST_META_FILE.c_path)?,
+            dumpcap_log: hash_file(root, WIRESHARK_LOG_FILE.c_path)?,
             data: hash_file(root, WIRESHARK_DATA_FILE.c_path)?,
         },
         None => {

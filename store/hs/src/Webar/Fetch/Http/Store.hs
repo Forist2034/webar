@@ -68,11 +68,13 @@ readFetch server ty p = do
         traffic <- case metaTraffic meta of
           Just TtWireshark -> do
             keyLog <- hashFile fd "sslkeylog.keys"
+            dumpcapLog <- hashFile fd "dumpcap.log"
             reqMeta <- hashFile fd "request_meta.tar"
             reqData <- hashFile fd "traffic.pcapng"
             pure
               TWireshark
                 { twKeyLog = keyLog,
+                  twDumpcapLog = dumpcapLog,
                   twRequestMeta = reqMeta,
                   twData = reqData
                 }

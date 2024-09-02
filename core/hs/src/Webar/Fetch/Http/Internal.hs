@@ -12,6 +12,8 @@ data Log
 
 data WiresharkData
 
+data DumpcapLog
+
 data RequestMeta
 
 data FetchData

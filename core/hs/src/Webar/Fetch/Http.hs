@@ -27,6 +27,8 @@ type KeyLogId = DigestField KeyLog
 
 type WiresharkDataId = DigestField WiresharkData
 
+type DumpcapLogId = DigestField DumpcapLog
+
 type LogId = DigestField Log
 
 type RequestMetaId = DigestField RequestMeta
@@ -41,6 +43,7 @@ data Traffic
   = TWireshark
       { twKeyLog :: KeyLogId,
         twRequestMeta :: RequestMetaId,
+        twDumpcapLog :: DumpcapLogId,
         twData :: WiresharkDataId
       }
   | -- | Traffic is not captured, so use fetched data to distinguish different

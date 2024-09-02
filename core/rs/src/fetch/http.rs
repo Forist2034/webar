@@ -26,6 +26,8 @@ pub mod internal {
 
     pub struct FetchData;
 
+    pub struct DumpcapLog;
+
     pub struct DigestField<T>(pub Digest, pub PhantomData<T>);
     impl<T> Debug for DigestField<T> {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -60,6 +62,8 @@ pub type KeyLogId = internal::DigestField<internal::KeyLog>;
 
 pub type WiresharkDataId = internal::DigestField<internal::WiresharkData>;
 
+pub type DumpcapLogId = internal::DigestField<internal::DumpcapLog>;
+
 pub type LogId = internal::DigestField<internal::Log>;
 
 pub type RequestMetaId = internal::DigestField<internal::RequestMeta>;
@@ -76,6 +80,7 @@ pub enum Traffic {
     #[serde(rename = "wireshark")]
     Wireshark {
         key_log: KeyLogId,
+        dumpcap_log: DumpcapLogId,
         request_meta: RequestMetaId,
         data: WiresharkDataId,
     },
