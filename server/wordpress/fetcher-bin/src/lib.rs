@@ -29,6 +29,8 @@ use webar_wordpress_fetcher::{client::Config, sink::TarSink, Client, Fetcher};
 
 pub type FileWriter = io::BufWriter<std::fs::File>;
 
+pub type FileFetcher = Fetcher<FileWriter, FileWriter>;
+
 fn open(root: BorrowedFd, name: &CStr) -> rustix::io::Result<std::fs::File> {
     fs::openat(
         root.as_fd(),
@@ -45,7 +47,7 @@ fn run(
     https_only: bool,
     instance: &Address<&str, &str>,
     user: (),
-    f: impl FnOnce(&mut Fetcher<FileWriter, FileWriter>) -> Result<()>,
+    f: impl FnOnce(&mut FileFetcher) -> Result<()>,
 ) -> Result<()> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -103,7 +105,7 @@ fn inner_main(
     https_only: bool,
     instance: &Address<&str, &str>,
     user: (),
-    f: impl FnOnce(&mut Fetcher<FileWriter, FileWriter>) -> Result<()>,
+    f: impl FnOnce(&mut FileFetcher) -> Result<()>,
 ) -> Result<()> {
     webar_rustls::global_init();
     webar_tracing::init(open(root, TRACING_LOG_FILE.c_path).context("failed to open log file")?)
@@ -129,7 +131,7 @@ pub fn fetch_main(
     https_only: bool,
     instance: &Address<&str, &str>,
     user: (),
-    f: impl FnOnce(&mut Fetcher<FileWriter, FileWriter>) -> Result<()>,
+    f: impl FnOnce(&mut FileFetcher) -> Result<()>,
 ) -> ExitCode {
     unsafe {
         webar_traffic_capture::dumpcap_main(dest, |root| {

@@ -42,7 +42,7 @@ impl<'a, 's, 'h, O: DeserializeOwned> Iterator for PageIter<'a, 's, 'h, O> {
             };
             let offset = self.offset;
             self.offset += data.len();
-            *self.has_more = self.offset < paging.total;
+            *self.has_more = self.offset < paging.total && data.len() != 0;
             Some(Ok(PagedData {
                 offset,
                 data,

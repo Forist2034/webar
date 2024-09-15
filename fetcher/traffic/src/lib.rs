@@ -47,7 +47,7 @@ unsafe fn run<E: std::fmt::Debug>(
     root_path: &str,
     f: impl FnOnce(BorrowedFd) -> Result<(), E>,
 ) -> Result<ExitCode> {
-    fs::mkdir(root_path, Mode::from_raw_mode(0o755)).context("failed to create root dir")?;
+    std::fs::create_dir_all(root_path).context("failed to create root dir")?;
 
     let dumpcap = Pid::from_child(
         &Command::new("dumpcap")
