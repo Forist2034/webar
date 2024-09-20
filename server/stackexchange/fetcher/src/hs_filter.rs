@@ -7,67 +7,67 @@ pub const HS_FILTER_INFO: TypeMap<FilterSpec<&str>> = TypeMap {
     answer: FilterSpec {
         name: ".BcrXh4RU(M_r5Qrar94ww5zJfMO32fPy",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "7de7f9f4017db2cbe9c4404ca97ea711b144d6739bdbdaf524dd087b099fb02d"
+            "0f37fe30b53c15e4aff78617d2b43853671acff65b2f4272152f5ebdad3ac49f"
         )))),
     },
     badge: FilterSpec {
         name: "3pH)E3HUeKQ7hx0WYJWum",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "cc5f7146b570ec0535fd251290a189b2844c9f6a754405df8729582aefcb596c"
+            "a1c39f8374bb8177b93532963f8254542a3dbe9e32b0b126182269324486c8b6"
         )))),
     },
     comment: FilterSpec {
         name: ")OgkWFXtkRBL.fntaKvbDSX(siri",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "5824f89f0ec4527664b740daa407d096ad8d5838964044d5625d3960c14e9053"
+            "2ea0f50afe9b98402df62c01a76f87c4e45555b29fbecec3cf96646ad75aec63"
         )))),
     },
     collective: FilterSpec {
         name: "aIKY(zS3d5vv.dREz*",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "b0eeb6b1c1d2aa88efc897928fecaf5ccabcca307d561f4f907e1249f5ba5989"
+            "c5867924d68836e6f4fbccf7b5023d8661f3c88542d8c7659ce4a484411b1dd5"
         )))),
     },
     info: FilterSpec {
         name: "S9)8yVzYJPOeK*_4YAeTUD",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "a4845bb12284db8aff025d1b0536a23df59fb351a93dd4222fee19c583786f56"
+            "48e85b468392e8b73caf37fbc7924671f155acc7cd156caed585a3b8287c2072"
         )))),
     },
     question: FilterSpec {
         name: "Csa39LsSH3q3d26SekiZhUTEepAsWwXYs(tUH*DF.J-q)D4l0fbs-z*",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "025bcb3e389a42842c78830cc5692cb2e71aeb0ed86378754cdcea9d80b11561"
+            "2ab30cca11aed2e7b1d86e78ef37d43c46e8fd0b180f34ced7fb0bfd0b74d35d"
         )))),
     },
     revision: FilterSpec {
         name: "S0LW7y9G39VsSNOC*FQvB9",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "b2356745a4554793c78f94754bcf9fa3843d97c70df1b47228211b0d9160666e"
+            "b75984a178edc4d93015796c119977be76d22169cb62fabf756546cc15076189"
         )))),
     },
     tag: FilterSpec {
         name: ")pmU07Nl*8faPpF39V*n6)ID",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "0b7a3175a6e93a29b666546efede702ad49f25da2eb8308d6af59e6c478b48fc"
+            "501effc565f1625ba162091159d277a4219900d71bb5e23edf19dbddb3afb22a"
         )))),
     },
     tag_synonym: FilterSpec {
         name: "a_LjP(LbK3SaJfWuW5",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "998864966351e5dbf6512333cb9cf600e4da46fb949f487a4129fd0449d58311"
+            "f3f506ac1a5faa2b517a66d8e71ddfbe9ac6263284b5f3a610446b24949566f8"
         )))),
     },
     tag_wiki: FilterSpec {
         name: "SIUtpsPZ-9l)fUK)qR2IvD",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "bdda284634f7c710b6abb7e2a0f618867d2d02c0399fa1c3f16fbfa440edae82"
+            "2ceb4965724c7118f0f03537c57498b11950de7e1641b0219613aac02d150c6a"
         )))),
     },
     user: FilterSpec {
         name: ")4lk-t8lU0Au6PWx0o1erLmkS(mCImce",
         id: FilterId::new(Digest::Sha256(Sha256(hex!(
-            "d1a4bd617173bf05b7bc4ef9c8c45e84f10c0c20f722b82025ee403f45b66f67"
+            "48e8751a0a138a50f3404f40d7abe59e6933bbc87e95ba903ffca0677b101409"
         )))),
     },
 };
