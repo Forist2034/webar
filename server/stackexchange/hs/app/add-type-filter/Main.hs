@@ -65,16 +65,16 @@ typeMapToRust tm =
     ]
   where
     filterInfo fi =
-      "FilterSpec{name: \""
+      "filter_sha256!(\""
         <> LTB.fromText (fsName fi)
-        <> "\",id: "
+        <> "\","
         <> ( case fsId fi of
                ObjectId (DSha256 d) ->
-                 "FilterId::new(Digest::Sha256(Sha256(hex!(\""
+                 "\""
                    <> LTB.fromString (sha256ToString d)
-                   <> "\"))))"
+                   <> "\""
            )
-        <> "}"
+        <> ")"
     field k v = "  " <> k <> ": " <> filterInfo v <> ",\n"
 
 type ObjectStore = OS.ObjectStore () ArchiveInfo SnapshotType RecordType
