@@ -71,7 +71,7 @@ pub mod id {
 mod site;
 pub use site::KnownSite;
 
-pub mod api {
+pub mod rest_api {
     use serde::Deserialize;
 
     use webar_data::ser::Serialize;
@@ -83,13 +83,35 @@ pub mod api {
         V2_3,
     }
 
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+    pub struct ApiInfo {
+        pub version: ApiVersion,
+        pub filter: filter::FilterId,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum ApiObjectType {
+        Answer,
+        Badge,
+        Collective,
+        Comment,
+        Info,
+        Question,
+        Revision,
+        // Site,
+        Tag,
+        TagSynonym,
+        TagWiki,
+        User,
+    }
+
     pub mod filter;
     pub mod model;
-    pub mod request;
+    pub mod source;
 }
 
 pub mod fetcher {
-    pub mod api_client;
+    pub mod rest_client;
 }
 
 pub mod image {

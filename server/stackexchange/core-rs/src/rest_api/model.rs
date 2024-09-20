@@ -1,23 +1,15 @@
-use std::fmt::Display;
-
 use serde::Deserialize;
 
 use crate::{
-    api::request::ApiObjectType,
     id::{
         AccountId, AnswerId, BadgeId, CollectiveSlug, CommentId, QuestionId, RevisionId, TagName,
         UserId,
     },
+    rest_api::ApiObjectType,
 };
 
 pub trait ApiObject: serde::de::DeserializeOwned {
     const TYPE: ApiObjectType;
-    type Id<'a>: Display
-    where
-        Self: 'a;
-    type OwnedId: Display;
-    fn id(&self) -> Self::Id<'_>;
-    fn into_id(self) -> Self::OwnedId;
 }
 
 #[derive(Deserialize)]
@@ -48,14 +40,6 @@ pub struct Answer {
 }
 impl ApiObject for Answer {
     const TYPE: ApiObjectType = ApiObjectType::Answer;
-    type Id<'a> = AnswerId;
-    type OwnedId = AnswerId;
-    fn id(&self) -> Self::Id<'_> {
-        self.answer_id
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.answer_id
-    }
 }
 
 #[derive(Deserialize)]
@@ -75,14 +59,6 @@ pub struct Comment {
 }
 impl ApiObject for Comment {
     const TYPE: ApiObjectType = ApiObjectType::Comment;
-    type Id<'a> = CommentId;
-    type OwnedId = CommentId;
-    fn id(&self) -> Self::Id<'_> {
-        self.comment_id
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.comment_id
-    }
 }
 
 #[derive(Deserialize)]
@@ -91,14 +67,6 @@ pub struct Badge {
 }
 impl ApiObject for Badge {
     const TYPE: ApiObjectType = ApiObjectType::Badge;
-    type Id<'a> = BadgeId;
-    type OwnedId = BadgeId;
-    fn id(&self) -> Self::Id<'_> {
-        self.badge_id
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.badge_id
-    }
 }
 
 #[derive(Deserialize)]
@@ -109,14 +77,6 @@ pub struct Collective {
 }
 impl ApiObject for Collective {
     const TYPE: ApiObjectType = ApiObjectType::Collective;
-    type Id<'a> = CollectiveSlug<&'a str>;
-    type OwnedId = CollectiveSlug<String>;
-    fn id(&self) -> Self::Id<'_> {
-        CollectiveSlug(&self.slug.0)
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.slug
-    }
 }
 
 #[derive(Deserialize)]
@@ -127,14 +87,6 @@ pub struct Revision {
 }
 impl ApiObject for Revision {
     const TYPE: ApiObjectType = ApiObjectType::Revision;
-    type Id<'a> = RevisionId;
-    type OwnedId = RevisionId;
-    fn id(&self) -> Self::Id<'_> {
-        self.revision_guid
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.revision_guid
-    }
 }
 
 #[derive(Deserialize)]
@@ -147,14 +99,6 @@ pub struct Tag {
 }
 impl ApiObject for Tag {
     const TYPE: ApiObjectType = ApiObjectType::Tag;
-    type Id<'a> = TagName<&'a str>;
-    type OwnedId = TagName<String>;
-    fn id(&self) -> Self::Id<'_> {
-        TagName(&self.name.0)
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.name
-    }
 }
 
 #[derive(Deserialize)]
@@ -164,14 +108,6 @@ pub struct TagSynonym {
 }
 impl ApiObject for TagSynonym {
     const TYPE: ApiObjectType = ApiObjectType::TagSynonym;
-    type Id<'a> = TagName<&'a str>;
-    type OwnedId = TagName<String>;
-    fn id(&self) -> Self::Id<'_> {
-        TagName(&self.from_tag.0)
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.from_tag
-    }
 }
 
 #[derive(Deserialize)]
@@ -184,14 +120,6 @@ pub struct TagWiki {
 }
 impl ApiObject for TagWiki {
     const TYPE: ApiObjectType = ApiObjectType::TagWiki;
-    type Id<'a> = TagName<&'a str>;
-    type OwnedId = TagName<String>;
-    fn id(&self) -> Self::Id<'_> {
-        TagName(&self.tag_name.0)
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.tag_name
-    }
 }
 
 #[derive(Deserialize)]
@@ -208,14 +136,6 @@ pub struct User {
 }
 impl ApiObject for User {
     const TYPE: ApiObjectType = ApiObjectType::User;
-    type Id<'a> = UserId;
-    type OwnedId = UserId;
-    fn id(&self) -> Self::Id<'_> {
-        self.user_id
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.user_id
-    }
 }
 
 #[derive(Deserialize)]
@@ -232,19 +152,12 @@ pub struct Question {
 }
 impl ApiObject for Question {
     const TYPE: ApiObjectType = ApiObjectType::Question;
-    type Id<'a> = QuestionId;
-    type OwnedId = QuestionId;
-    fn id(&self) -> Self::Id<'_> {
-        self.question_id
-    }
-    fn into_id(self) -> Self::OwnedId {
-        self.question_id
-    }
 }
 
 #[derive(Deserialize)]
-pub struct Info<S> {
-    pub site: S,
+pub struct Info {}
+impl ApiObject for Info {
+    const TYPE: ApiObjectType = ApiObjectType::Info;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]

@@ -4,10 +4,8 @@ module Webar.Server.StackExchange.Source where
 
 import Webar.Data.TH
 import Webar.Object
-import qualified Webar.Server.StackExchange.Api.Request as Api.Request
-import qualified Webar.Server.StackExchange.Api.Source as Api.Source
 import qualified Webar.Server.StackExchange.Image.Source as Img.Source
-import Webar.Server.StackExchange.Types (ApiSiteParameter)
+import qualified Webar.Server.StackExchange.RestApi.Source as RestApi
 import Webar.Types (Server (..), Version (Version))
 
 server :: Server
@@ -23,7 +21,7 @@ deriveSumData
   ''FetchType
 
 data RecordType
-  = RtApiRequest {-# UNPACK #-} Api.Request.RequestRecord
+  = RtRestApi {-# UNPACK #-} RestApi.RequestRecord
   | RtFilter
   | RtImageRequest {-# UNPACK #-} Img.Source.RequestRecord
   deriving (Show, Eq)
@@ -35,7 +33,7 @@ deriveSumData
   ''RecordType
 
 data ArchiveInfo
-  = AiSiteApi ApiSiteParameter Api.Source.ArchiveSiteData
+  = AiRestApi RestApi.Archive
   | AiImage Img.Source.ArchiveImage
   deriving (Show, Eq)
 
@@ -48,7 +46,7 @@ deriveSumData
 type ArchiveId = ObjectId ArchiveInfo
 
 data SnapshotType
-  = StApi Api.Source.ApiSnapshotType
+  = StRestApi RestApi.SnapshotType
   | StImage {-# UNPACK #-} Img.Source.SnapshotType
   deriving (Show, Eq)
 

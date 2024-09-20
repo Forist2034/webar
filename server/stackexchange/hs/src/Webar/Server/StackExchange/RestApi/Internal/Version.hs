@@ -1,13 +1,9 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module Webar.Server.StackExchange.Api.Types
-  ( ApiVersion (..),
-    module T,
-  )
-where
+-- | avoid cyclic dependencies between Filter and Types
+module Webar.Server.StackExchange.RestApi.Internal.Version (ApiVersion (..)) where
 
 import Webar.Data.TH
-import Webar.Server.StackExchange.Types as T
 
 data ApiVersion
   = Api2_3

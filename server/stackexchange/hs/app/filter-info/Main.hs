@@ -11,8 +11,8 @@ import qualified Data.Vector as V
 import System.Environment (getArgs)
 import Webar.Data.Json (encodeStrictBs)
 import Webar.Data.Json.TH
-import Webar.Server.StackExchange.Api.Filter
-import Webar.Server.StackExchange.Api.Model
+import Webar.Server.StackExchange.RestApi.Filter
+import Webar.Server.StackExchange.RestApi.Model
 
 defWrapper :: V.Vector Text
 defWrapper =
@@ -62,6 +62,6 @@ main = do
             tmTagSynonym = mkFilter @TagSynonym Proxy,
             tmTagWiki = mkFilter @TagWiki Proxy,
             tmUser = mkFilter @User Proxy,
-            tmInfo = mkFilter @SiteInfo Proxy
+            tmInfo = mkFilter @Info Proxy
           }
     )

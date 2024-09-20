@@ -1,14 +1,8 @@
 use std::{io, path::Path};
 
-use webar_data::{
-    cbor,
-    ser::{Never, Serialize},
-};
+use webar_data::{cbor, ser::Serialize};
 
-use webar_stackexchange_core::{
-    api::request::ResponseData,
-    fetcher::api_client::{ApiResponse, ListData, ObjectsData},
-};
+use webar_stackexchange_core::fetcher::rest_client::{ApiResponse, HttpRequest};
 
 pub use io::Error;
 
@@ -35,56 +29,13 @@ impl<MW: io::Write, RW: io::Write> TarSink<MW, RW> {
         }
     }
 
-    fn add_meta<O: Serialize>(&mut self, meta: &ApiResponse<O>) -> Result<(), Error> {
-        add_file(
-            &mut self.meta,
-            format!("{}.bin", meta.seq),
-            &cbor::to_vec(meta),
-        )
-    }
-    fn add_response<O: Serialize>(&mut self, response: &ApiResponse<O>) -> Result<(), Error> {
-        add_file(
-            &mut self.response,
-            format!("{}.bin", response.seq),
-            &cbor::to_vec(response),
-        )
-    }
-
-    pub fn add_objects(&mut self, response: &ApiResponse<ObjectsData>) -> Result<(), Error> {
-        self.add_meta(&ApiResponse {
-            site: response.site,
-            seq: response.seq,
-            api_version: response.api_version,
-            filter: response.filter,
-            data: ResponseData::Objects::<_, Never>(response.data.to_meta()),
-        })?;
-        self.add_response(&ApiResponse {
-            site: response.site,
-            seq: response.seq,
-            api_version: response.api_version,
-            filter: response.filter,
-            data: ResponseData::Objects::<_, Never>(&response.data),
-        })
-    }
-
-    pub fn add_lists<S: Serialize>(
+    pub fn add_response<S: Copy + Serialize>(
         &mut self,
-        response: &ApiResponse<ListData<S>>,
+        response: &ApiResponse<S, HttpRequest>,
     ) -> Result<(), Error> {
-        self.add_meta(&ApiResponse {
-            site: response.site,
-            seq: response.seq,
-            api_version: response.api_version,
-            filter: response.filter,
-            data: ResponseData::List::<Never, _>(response.data.to_meta()),
-        })?;
-        self.add_response(&ApiResponse {
-            site: response.site,
-            seq: response.seq,
-            api_version: response.api_version,
-            filter: response.filter,
-            data: ResponseData::List::<Never, _>(&response.data),
-        })
+        let path = format!("{}.bin", response.seq);
+        add_file(&mut self.response, &path, &cbor::to_vec(response))?;
+        add_file(&mut self.meta, &path, &cbor::to_vec(&response.to_meta()))
     }
 
     pub fn into_inner(self) -> Result<(MW, RW), Error> {

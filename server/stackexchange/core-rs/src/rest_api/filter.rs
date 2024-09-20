@@ -5,7 +5,7 @@ use serde::Deserialize;
 use webar_core::object::ObjectId;
 use webar_data::ser::{Never, Serialize};
 
-use crate::api::request::ApiObjectType;
+use crate::rest_api::ApiObjectType;
 
 // stub definition
 pub struct FilterInfo(Never);

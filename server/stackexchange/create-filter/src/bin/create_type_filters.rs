@@ -3,7 +3,7 @@ use std::{env::args_os, fs, path::Path, process::ExitCode};
 use anyhow::{Context, Result};
 
 use webar_data::cbor;
-use webar_stackexchange_core::api::filter::TypeMap;
+use webar_stackexchange_core::rest_api::filter::TypeMap;
 
 use stackexchange_create_filter::FilterConfig;
 

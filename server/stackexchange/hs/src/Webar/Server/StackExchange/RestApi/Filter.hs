@@ -2,7 +2,7 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Webar.Server.StackExchange.Api.Filter
+module Webar.Server.StackExchange.RestApi.Filter
   ( FilterData,
     FilterInfo (..),
     FilterId,
@@ -19,9 +19,9 @@ import Data.Text (Text)
 import Webar.Blob
 import Webar.Data.TH
 import Webar.Object
-import Webar.Server.StackExchange.Api.Filter.Internal
-import Webar.Server.StackExchange.Api.Internal.BlobData
-import Webar.Server.StackExchange.Api.Types (ApiVersion)
+import Webar.Server.StackExchange.RestApi.Filter.Internal
+import Webar.Server.StackExchange.RestApi.Internal.BlobData
+import Webar.Server.StackExchange.RestApi.Internal.Version (ApiVersion)
 
 data FilterInfo = FilterInfo
   { fiName :: Text,

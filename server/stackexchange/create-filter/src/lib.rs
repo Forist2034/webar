@@ -7,7 +7,7 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 
 use webar_data::bytes::ByteBuf;
-use webar_stackexchange_core::api::model;
+use webar_stackexchange_core::rest_api::model;
 
 #[derive(Debug)]
 pub enum CreateError {

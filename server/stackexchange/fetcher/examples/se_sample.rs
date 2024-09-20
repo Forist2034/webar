@@ -12,6 +12,7 @@ use rustix::{
     fd::{AsFd, BorrowedFd},
     fs::{Mode, OFlags},
 };
+use serde::de::DeserializeOwned;
 use webar_core::{
     fetch::{
         http::{Metadata, KEY_LOG_FILE, REQUEST_META_FILE, TRACING_LOG_FILE},
@@ -25,12 +26,7 @@ use webar_stackexchange_core::{
     KnownSite,
 };
 use webar_stackexchange_fetcher::{
-    client::{
-        self, AnswerHandler, AnswersHandler, GetInfo, QuestionHandler, QuestionsHandler,
-        TagHandler, TagsHandler, UserHandler, UsersHandler,
-    },
-    sink::TarSink,
-    Client, Fetcher, ManyChunk, NonEmpty, HS_FILTER_INFO,
+    client, sink::TarSink, Client, EdgeIter, Fetcher, Handler, HS_FILTER_INFO,
 };
 
 // formatting sandbox
@@ -46,16 +42,27 @@ fn open(root: BorrowedFd<'_>, name: &CStr) -> Result<std::fs::File, rustix::io::
     .map(std::fs::File::from)
 }
 
+fn get_all<O: DeserializeOwned>(iter: EdgeIter<O>) -> Result<(), client::Error> {
+    for v in iter {
+        v?;
+    }
+    Ok(())
+}
+fn get_first_2<O: DeserializeOwned>(iter: EdgeIter<O>) -> Result<(), client::Error> {
+    for v in iter.take(2) {
+        v?;
+    }
+    Ok(())
+}
+
 fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .context("failed to build tokio runtime")?;
     let mut fetcher = Fetcher {
+        seq: 0,
         client: Client {
-            seq: 0,
-            site: KnownSite::MetaStackExchange,
-            filter: HS_FILTER_INFO,
             runtime: rt.handle().clone(),
             client: reqwest::ClientBuilder::new()
                 .use_preconfigured_tls(webar_rustls::default_config(io::BufWriter::new(
@@ -75,15 +82,22 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
     };
     let start_time = Timestamp::now();
 
+    let handler = Handler {
+        site: KnownSite::MetaStackExchange,
+        filters: HS_FILTER_INFO,
+    };
+
     fetcher
-        .fetch_object(GetInfo)
+        .fetch_node(handler.get_info())
         .context("failed to get info")?;
 
-    let questions = QuestionsHandler::<[QuestionId; 0]>(NonEmpty(QUESTION_ID, []));
-    let question = QuestionHandler(QUESTION_ID);
+    let question = handler.question(QUESTION_ID);
     let q = fetcher
-        .fetch_object(questions.get())
-        .context("failed to fetch question")?;
+        .fetch_node(question.get())
+        .context("failed to fetch question")?
+        .data
+        .items
+        .context("missing question body")?;
 
     if full {
         const START: NonZeroUsize = match NonZeroUsize::new(1) {
@@ -91,126 +105,73 @@ fn run(full: bool, root: BorrowedFd<'_>) -> anyhow::Result<()> {
             None => unreachable!(),
         };
 
-        // tags
-        for t in ManyChunk::<20, _>(
-            q.parsed.items[0]
-                .tags
-                .iter()
-                .map(|t| TagName(t.0.as_str()))
-                .fuse(),
-        ) {
-            let t = TagsHandler(t);
-            fetcher.fetch_object(t.get()).context("failed to get tag")?;
+        for TagName(ref tn) in q.tags.iter() {
+            let t = handler.tag(TagName(tn.as_str()));
+            fetcher.fetch_node(t.get()).context("failed to get tag")?;
             fetcher
-                .fetch_object(t.wikis())
+                .fetch_node(t.get_wiki())
                 .context("failed to get tag wiki")?;
-            for th in t.0.iter().copied().map(TagHandler) {
-                fetcher
-                    .with_list_iter::<_, _, client::Error>(th.synonyms(), START, |it| {
-                        for s in it {
-                            s?;
-                        }
-                        Ok(())
-                    })
-                    .context("failed to get tag synonym")?;
-            }
+            fetcher
+                .with_edge_iter(t.list_synonyms(), START, get_all)
+                .context("failed to get tag synonym")?;
         }
 
         // question revision
         fetcher
-            .with_list_iter::<_, _, client::Error>(question.revisions(), START, |it| {
-                for r in it.take(5) {
-                    r?;
-                }
-                Ok(())
-            })
-            .context("failed to get revision")?;
+            .fetch_revision(question.list_revisions())
+            .context("failed to get revisions")?;
 
         fetcher
-            .with_list_iter::<_, _, client::Error>(question.comments(), START, |it| {
-                for c in it.take(3) {
-                    c?;
-                }
-                Ok(())
-            })
-            .context("failed to write comment")?;
+            .with_edge_iter(question.list_comments(), START, get_first_2)
+            .context("failed to get comments")?;
 
         let ans = fetcher
-            .with_list_iter::<_, _, client::Error>(question.answers(), START, |mut it| {
-                Ok([it.next().unwrap()?, it.next().unwrap()?])
-            })
+            .with_edge_iter(
+                question.list_answers(),
+                START,
+                |mut it| -> Result<_, client::Error> {
+                    let mut ret = it.next().unwrap()?.items;
+                    ret.extend(it.next().unwrap()?.items);
+                    Ok(ret)
+                },
+            )
             .context("failed to get answer")?
             .0;
 
         // answers
-        for ans in
-            ManyChunk::<20, _>(ans.iter().flat_map(|r| r.items.iter().map(|i| i.answer_id))).take(1)
-        {
-            let ans = AnswersHandler(ans);
+        for ans in ans.iter().take(10) {
+            let ans = handler.answer(ans.answer_id);
             fetcher
-                .fetch_object(ans.get())
+                .fetch_node(ans.get())
                 .context("failed to get answer")?;
             fetcher
-                .fetch_object(ans.questions())
-                .context("failed to get answer question")?;
-            for ah in ans.0.iter().copied().map(AnswerHandler) {
-                fetcher
-                    .with_list_iter::<_, _, client::Error>(ah.revisions(), START, |it| {
-                        for r in it.take(2) {
-                            r?;
-                        }
-                        Ok(())
-                    })
-                    .context("failed to get answer revision")?;
-            }
+                .fetch_revision(ans.list_revisions())
+                .context("failed to get answer revision")?;
         }
 
         // users
-        for us in ManyChunk::<20, _>(ans.iter().flat_map(|r| {
-            r.items
-                .iter()
-                .filter_map(|i| i.last_editor.as_ref().and_then(|e| e.user_id))
-        }))
-        .take(1)
+        for us in ans
+            .iter()
+            .filter_map(|a| a.last_editor.as_ref().and_then(|e| e.user_id))
+            .take(10)
         {
-            let us = UsersHandler(us);
+            let us = handler.user(us);
             fetcher
-                .fetch_object(us.get())
+                .fetch_node(us.get())
                 .context("failed to get users")?;
-            for uh in us.0.iter().copied().map(UserHandler) {
-                fetcher
-                    .with_list_iter::<_, _, client::Error>(uh.answers(), START, |it| {
-                        for a in it.take(2) {
-                            a?;
-                        }
-                        Ok(())
-                    })
-                    .context("failed to get user answers")?;
-                fetcher
-                    .with_list_iter::<_, _, client::Error>(uh.badges(), START, |it| {
-                        for b in it.take(2) {
-                            b?;
-                        }
-                        Ok(())
-                    })
-                    .context("failed to get user badges")?;
-                fetcher
-                    .with_list_iter::<_, _, client::Error>(uh.questions(), START, |it| {
-                        for q in it.take(2) {
-                            q?;
-                        }
-                        Ok(())
-                    })
-                    .context("failed to get user questions")?;
-                fetcher
-                    .with_list_iter::<_, _, client::Error>(uh.comments(), START, |it| {
-                        for c in it.take(2) {
-                            c?;
-                        }
-                        Ok(())
-                    })
-                    .context("failed to get user comments")?;
-            }
+
+            fetcher
+                .with_edge_iter(us.list_answers(), START, get_first_2)
+                .context("failed to get user answers")?;
+            fetcher
+                .with_edge_iter(us.list_badges(), START, get_first_2)
+                .context("failed to get user badges")?;
+            fetcher
+                .with_edge_iter(us.list_comments(), START, get_first_2)
+                .context("failed to get user comments")?;
+            fetcher
+                .with_edge_iter(us.list_questions(), START, get_first_2)
+                .context("failed to get user questions")?;
         }
     }
 

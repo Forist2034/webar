@@ -1,41 +1,18 @@
-use std::{
-    convert::Infallible, fmt::Debug, io, iter::FusedIterator, num::NonZeroUsize, thread::sleep,
-    time::Duration,
+use std::{convert::Infallible, fmt::Debug, io, iter::FusedIterator, num::NonZeroUsize};
+
+use serde::de::DeserializeOwned;
+use webar_stackexchange_core::{
+    fetcher::rest_client::{ApiResponse, HttpRequest},
+    rest_api::model,
 };
 
-use webar_data::ser::Serialize;
-use webar_stackexchange_core::{
-    api::model,
-    fetcher::api_client::{ApiData, ApiResponse, ListData, ObjectsData},
-};
+pub mod handler;
+pub use handler::Handler;
 
 pub mod client;
 pub use client::Client;
 
 pub mod sink;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct NonEmpty<T, I>(pub T, pub I);
-impl<T, I: AsRef<[T]>> NonEmpty<T, I> {
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        self.1.as_ref().into_iter().chain(std::iter::once(&self.0))
-    }
-}
-
-pub struct ManyChunk<const N: usize, I>(pub I);
-impl<const N: usize, I: FusedIterator> Iterator for ManyChunk<N, I> {
-    type Item = NonEmpty<I::Item, Vec<I::Item>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        Some(NonEmpty(self.0.next()?, self.0.by_ref().take(N).collect()))
-    }
-}
-
-fn wait_backoff(backoff: Option<u64>) {
-    if let Some(b) = backoff {
-        tracing::info!(backoff = b, "received backoff");
-        sleep(Duration::from_secs(b));
-    }
-}
 
 mod hs_filter;
 pub use hs_filter::HS_FILTER_INFO;
@@ -50,31 +27,27 @@ pub enum Error<E> {
     Inner(#[source] E),
 }
 
-pub struct Fetcher<MW: io::Write, RW: io::Write, FN> {
-    pub client: Client<FN>,
+pub struct Fetcher<MW: io::Write, RW: io::Write> {
+    pub seq: u32,
+    pub client: Client,
     pub sink: sink::TarSink<MW, RW>,
 }
 
-pub struct ListIter<'a, FN, E: client::ListApi> {
-    request: &'a mut client::ListReq<E, E::Str>,
-    client: &'a mut client::Client<FN>,
+pub struct EdgeIter<'a, 's, O> {
+    request: &'a mut handler::EdgeReq<'s, O>,
+    client: &'a mut client::Client,
     has_more: &'a mut bool,
-    page: usize,
+    page: NonZeroUsize,
 }
-impl<'a, FN, E> Iterator for ListIter<'a, FN, E>
-where
-    FN: AsRef<str>,
-    E: client::ListApi,
-{
-    type Item = Result<model::Wrapper<Vec<E::Output>>, client::Error>;
+impl<'a, 's, O: DeserializeOwned> Iterator for EdgeIter<'a, 's, O> {
+    type Item = Result<model::Wrapper<Vec<O>>, client::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         if *self.has_more {
             let _span = tracing::info_span!("fetch_page", page = self.page).entered();
-            let ret = self.client.request_list(&mut self.request, self.page);
+            let ret = self.client.request_edge(&mut self.request, self.page);
             if let Ok(ref o) = ret {
-                wait_backoff(o.backoff);
                 *self.has_more = o.has_more;
-                self.page += 1;
+                self.page = self.page.checked_add(1).unwrap();
             }
             Some(ret)
         } else {
@@ -82,60 +55,68 @@ where
         }
     }
 }
-impl<'a, E, FN> FusedIterator for ListIter<'a, FN, E>
-where
-    FN: AsRef<str>,
-    E: client::ListApi,
-{
-}
+impl<'a, 's, O: DeserializeOwned> FusedIterator for EdgeIter<'a, 's, O> {}
 
-impl<MW, RW, FN> Fetcher<MW, RW, FN>
+impl<MW, RW> Fetcher<MW, RW>
 where
     MW: io::Write,
     RW: io::Write,
-    FN: AsRef<str>,
 {
-    pub fn fetch_object<R: client::ObjectApi>(
+    pub fn fetch_node<'s, O: DeserializeOwned>(
         &mut self,
-        request: R,
-    ) -> Result<ApiData<ObjectsData, R::Output>, Error<Infallible>> {
-        let _entered = tracing::info_span!("objects_request", "type" = R::TYPE.as_str()).entered();
-        let ret = self.client.request_object(request).map_err(Error::Client)?;
-        self.sink.add_objects(&ret.response).map_err(Error::Sink)?;
+        req: handler::NodeReq<'s, O>,
+    ) -> Result<client::NodeData<'s, O>, Error<Infallible>> {
+        let _span =
+            tracing::info_span!("fetch_node", ty = tracing::field::debug(&req.ty)).entered();
+        let ret = self
+            .client
+            .request_node(self.seq, req)
+            .map_err(Error::Client)?;
+        self.seq += 1;
+        self.sink.add_response(&ret.response).map_err(Error::Sink)?;
         Ok(ret)
     }
 
-    pub fn with_list_iter<R: client::ListApi, T, E>(
+    pub fn with_edge_iter<'s, T, E, O: DeserializeOwned>(
         &mut self,
-        request: R,
+        mut req: handler::EdgeReq<'s, O>,
         page: NonZeroUsize,
-        f: impl FnOnce(ListIter<'_, FN, R>) -> Result<T, E>,
-    ) -> Result<(T, ApiResponse<ListData<R::Str>>), Error<E>>
-    where
-        R::Str: Debug + Serialize,
-    {
-        let mut request = request.into_req();
-
+        f: impl FnOnce(EdgeIter<O>) -> Result<T, E>,
+    ) -> Result<(T, ApiResponse<&'s str, HttpRequest>), Error<E>> {
         let _span = tracing::info_span!(
-            "list_request",
-            request = tracing::field::debug(&request.request),
+            "edge_request",
+            ty = tracing::field::debug(&req.ty),
             start_page = page
         )
         .entered();
 
         let mut has_more = true;
-        let ret = f(ListIter {
+        let ret = f(EdgeIter {
             client: &mut self.client,
             has_more: &mut has_more,
-            page: page.get(),
-            request: &mut request,
+            page,
+            request: &mut req,
         })
         .map_err(Error::Inner)?;
 
-        let resp = self
-            .client
-            .finish_list(request, page.get() == 1 && has_more);
-        self.sink.add_lists(&resp).map_err(Error::Sink)?;
+        let resp = req.finish(self.seq, page.get() == 1 && !has_more);
+        self.seq += 1;
+        self.sink.add_response(&resp).map_err(Error::Sink)?;
         Ok((ret, resp))
+    }
+
+    pub fn fetch_revision<'s>(
+        &mut self,
+        req: handler::RevisionReq<'s>,
+    ) -> Result<client::RevisionData<'s>, Error<Infallible>> {
+        let _span =
+            tracing::info_span!("revision_request", ty = tracing::field::debug(&req.ty)).entered();
+        let ret = self
+            .client
+            .request_revision(self.seq, req)
+            .map_err(Error::Client)?;
+        self.seq += 1;
+        self.sink.add_response(&ret.response).map_err(Error::Sink)?;
+        Ok(ret)
     }
 }

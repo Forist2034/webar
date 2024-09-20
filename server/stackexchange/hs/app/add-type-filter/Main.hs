@@ -17,10 +17,10 @@ import qualified Webar.Data.BinJson as BinJson
 import qualified Webar.Data.Cbor as Cbor
 import Webar.Digest
 import Webar.Object
-import Webar.Server.StackExchange.Api.Filter
-import Webar.Server.StackExchange.Api.Internal.BlobData
-import Webar.Server.StackExchange.Api.Model (Filter (..), FilterType (..))
-import Webar.Server.StackExchange.Api.Types
+import Webar.Server.StackExchange.RestApi.Filter
+import Webar.Server.StackExchange.RestApi.Internal.BlobData
+import Webar.Server.StackExchange.RestApi.Model (Filter (..), FilterType (..))
+import Webar.Server.StackExchange.RestApi.Types
 import Webar.Server.StackExchange.Source
 import qualified Webar.Store.Blob.Base as DS.B
 import qualified Webar.Store.Blob.WithShared as DS

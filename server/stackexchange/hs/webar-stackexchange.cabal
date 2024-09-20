@@ -10,18 +10,20 @@ build-type:    Simple
 library
     exposed-modules:
         Webar.Server.StackExchange.Types
-        Webar.Server.StackExchange.Api.Types
-        Webar.Server.StackExchange.Api.Filter
-        Webar.Server.StackExchange.Api.Request
-        Webar.Server.StackExchange.Api.Model
-        Webar.Server.StackExchange.Api.Source
-        Webar.Server.StackExchange.Api.Internal.BlobData
+        Webar.Server.StackExchange.RestApi.Types
+        Webar.Server.StackExchange.RestApi.Filter
+        Webar.Server.StackExchange.RestApi.Model
+        Webar.Server.StackExchange.RestApi.Source
+        Webar.Server.StackExchange.RestApi.Internal.BlobData
         Webar.Server.StackExchange.Image.Source
         Webar.Server.StackExchange.Source
-        Webar.Server.StackExchange.Fetcher.ApiClient
+        Webar.Server.StackExchange.Fetcher.RestClient
 
     hs-source-dirs:     src
-    other-modules:      Webar.Server.StackExchange.Api.Filter.Internal
+    other-modules:
+        Webar.Server.StackExchange.RestApi.Filter.Internal
+        Webar.Server.StackExchange.RestApi.Internal.Version
+
     default-language:   Haskell2010
     default-extensions: OverloadedStrings StrictData
     ghc-options:        -Wall

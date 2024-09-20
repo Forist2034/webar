@@ -5,14 +5,14 @@
 {-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Webar.Server.StackExchange.Api.Model where
+module Webar.Server.StackExchange.RestApi.Model where
 
 import Data.Aeson
 import Data.Aeson.TH (deriveFromJSON)
 import qualified Data.Text as T
 import Data.Vector (Vector)
 import Data.Word (Word64)
-import Webar.Server.StackExchange.Api.Filter.Internal
+import Webar.Server.StackExchange.RestApi.Filter.Internal
 import Webar.Server.StackExchange.Types
 
 type Tags = Maybe (Vector TagName)
@@ -346,13 +346,13 @@ deriveFromJSON
 
 deriveToFilter "site" 3 ''Site
 
-newtype SiteInfo = SiteInfo {sitInfoSite :: Site}
+newtype Info = Info {infoSite :: Site}
 
 deriveFromJSON
-  defaultOptions {fieldLabelModifier = camelTo2 '_' . drop 7}
-  ''SiteInfo
+  defaultOptions {fieldLabelModifier = camelTo2 '_' . drop 4}
+  ''Info
 
-deriveToFilter "info" 7 ''SiteInfo
+deriveToFilter "info" 4 ''Info
 
 newtype SiteRef = SiteRef {sitRefApiSiteParameter :: ApiSiteParameter} deriving (Show)
 

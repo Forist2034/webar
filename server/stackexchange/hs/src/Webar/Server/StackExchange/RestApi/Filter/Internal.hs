@@ -6,7 +6,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE TypeApplications #-}
 
-module Webar.Server.StackExchange.Api.Filter.Internal where
+module Webar.Server.StackExchange.RestApi.Filter.Internal where
 
 import Data.Foldable
 import Data.Functor

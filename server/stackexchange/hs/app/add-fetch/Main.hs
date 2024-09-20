@@ -3,7 +3,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -11,21 +10,21 @@ module Main (main) where
 
 import Control.Exception
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Data.Aeson
 import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.TH as Aeson.TH
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Lazy as LBS
 import Data.Conduit ((.|))
 import qualified Data.Conduit as C
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Conduit.Tar as Tar
-import Data.Foldable (traverse_)
+import Data.Foldable (Foldable (foldl'))
 import Data.Functor (void)
 import qualified Data.Map.Strict as M
 import Data.Maybe (isJust)
 import Data.Proxy (Proxy (Proxy))
 import qualified Data.Set as S
+import Data.Vector (Vector)
 import qualified Data.Vector as V
 import Data.Word (Word32)
 import Image
@@ -40,13 +39,12 @@ import qualified Webar.Data.Json as Json
 import Webar.Fetch.Http.Store (Fetch (..), withFetch)
 import Webar.Http
 import Webar.Object
-import Webar.Server.StackExchange.Api.Filter (FilterId)
-import Webar.Server.StackExchange.Api.Internal.BlobData
-import qualified Webar.Server.StackExchange.Api.Model as Api
-import Webar.Server.StackExchange.Api.Request
-import Webar.Server.StackExchange.Api.Source
-import Webar.Server.StackExchange.Api.Types
-import Webar.Server.StackExchange.Fetcher.ApiClient
+import Webar.Server.StackExchange.Fetcher.RestClient
+import Webar.Server.StackExchange.RestApi.Internal.BlobData
+import qualified Webar.Server.StackExchange.RestApi.Model as Api
+import Webar.Server.StackExchange.RestApi.Source hiding (Archive, SnapshotType)
+import qualified Webar.Server.StackExchange.RestApi.Source as Src
+import Webar.Server.StackExchange.RestApi.Types
 import Webar.Server.StackExchange.Source
 import qualified Webar.Store.Blob.Base as DS.B
 import Webar.Store.Blob.WithShared (BlobStore)
@@ -110,76 +108,78 @@ addHttpResponse ::
   Word32 ->
   Int ->
   HttpRequest ->
-  IO HttpResponseId
+  IO (ObjectId HttpInfo)
 addHttpResponse ctx callSeq respIdx req =
   DS.addBlob ctx.ctxDataStore req.hrResponse.respBody >>= \body ->
     OS.objectId
       <$> OS.addObject
         ctx.ctxObjectStore
-        (OtRecord (RtApiRequest RrHttpRequest))
+        (OtRecord (RtRestApi RrHttpRequest))
         (Version 1 0)
         HttpInfo
-          { hiUrl = req.hrRequest.reqUrl,
-            hiFetch = ctxFetchId ctx,
-            hiRequestId = req.hrRequest.reqId,
-            hiCallSeq = callSeq,
+          { hiFetch = ctxFetchId ctx,
+            hiSeq = callSeq,
             hiResponseIndex = fromIntegral respIdx,
+            hiRequest = req.hrRequest,
             hiResponse = (hrResponse req) {respBody = body.blobId}
           }
 
-addApiResponse :: Context -> ApiInfo -> IO ApiResponseId
+addApiResponse :: Context -> ApiResponseInfo -> IO (ObjectId ApiResponseInfo)
 addApiResponse ctx resp =
   OS.objectId
-    <$> OS.addObject ctx.ctxObjectStore (OtRecord (RtApiRequest RrApiResponse)) (Version 1 0) resp
+    <$> OS.addObject ctx.ctxObjectStore (OtRecord (RtRestApi RrApiResponse)) (Version 1 0) resp
 
-addSnapshot :: (Cbor.ToCbor a) => Context -> ArchiveInfo -> SnapshotType -> a -> IO ()
+addSnapshot :: (Cbor.ToCbor a) => Context -> Src.Archive -> Src.SnapshotType -> a -> IO ()
 addSnapshot ctx archive ty meta =
-  OS.addObject ctx.ctxObjectStore OtArchive (Version 1 0) archive >>= \arch ->
-    void (OS.addObject ctx.ctxObjectStore (OtSnapshot arch.objectId ty) (Version 1 0) meta)
+  OS.addObject ctx.ctxObjectStore OtArchive (Version 1 0) (AiRestApi archive) >>= \arch ->
+    void
+      ( OS.addObject
+          ctx.ctxObjectStore
+          (OtSnapshot arch.objectId (StRestApi ty))
+          (Version 1 0)
+          meta
+      )
 
-data ItemMeta = ItemMeta
-  { imSite :: !ApiSiteParameter,
-    imApiResponseId :: !ApiResponseId,
-    imApiVersion :: !ApiVersion,
-    imFilter :: !FilterId,
-    imTimestamp :: !Timestamp
+data NodeMeta = NodeMeta
+  { nmApiResponseId :: !(ObjectId ApiResponseInfo),
+    nmApi :: !ApiInfo,
+    nmTimestamp :: !Timestamp
   }
 
-addApiItem :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> a -> IO ()
-addApiItem ctx meta archive bv =
-  DS.addBlob ctx.ctxDataStore (ApiData (BinJsonData (Cbor.encodeStrictBs bv))) >>= \dat ->
+addArchiveNode :: (Cbor.ToCbor a) => Context -> NodeMeta -> Src.ArchiveNode -> a -> IO ()
+addArchiveNode ctx meta archive bv =
+  DS.addBlob ctx.ctxDataStore (NodeData (BinJsonData (Cbor.encodeStrictBs bv))) >>= \dat ->
     addSnapshot
       ctx
-      (AiSiteApi meta.imSite archive)
-      (StApi AstObject)
-      ObjectMeta
-        { objFetch = ctx.ctxFetchId,
-          objApiResponse = meta.imApiResponseId,
-          objContent = CNormal dat.blobId,
-          objApiVersion = meta.imApiVersion,
-          objFilter = meta.imFilter,
-          objTimestamp = meta.imTimestamp
+      (Src.ANode archive)
+      Src.StNode
+      SnapshotInfo
+        { siFetch = ctx.ctxFetchId,
+          siApiResponse = meta.nmApiResponseId,
+          siApi = meta.nmApi,
+          siTimestamp = meta.nmTimestamp,
+          siContent = NcNormal dat.blobId
         }
 
-addItemList :: (Cbor.ToCbor a) => Context -> ItemMeta -> ArchiveSiteData -> Bool -> S.Set a -> IO ()
-addItemList ctx meta archive full v =
-  DS.addBlob ctx.ctxDataStore (ListData (CborData (Cbor.encodeStrictBs v))) >>= \dat ->
+addArchiveEdge :: (Cbor.ToCbor a) => Context -> NodeMeta -> Src.ArchiveEdge -> Bool -> S.Set a -> IO ()
+addArchiveEdge ctx meta archive full v =
+  DS.addBlob ctx.ctxDataStore (SetData (CborData (Cbor.encodeStrictBs v))) >>= \dat ->
     addSnapshot
       ctx
-      (AiSiteApi meta.imSite archive)
-      (StApi AstList)
-      ListMeta
-        { listFetch = ctx.ctxFetchId,
-          listApiResponse = meta.imApiResponseId,
-          listContent = LcNormal {lcContent = dat.blobId, lcFull = full},
-          listApiVersion = meta.imApiVersion,
-          listTimestamp = meta.imTimestamp
+      (Src.AEdge archive)
+      (StEdge SeSet)
+      SnapshotInfo
+        { siFetch = ctx.ctxFetchId,
+          siApiResponse = meta.nmApiResponseId,
+          siApi = meta.nmApi,
+          siTimestamp = meta.nmTimestamp,
+          siContent = ScNormal {scContent = dat.blobId, scFull = full}
         }
 
-class (Json.FromJSON a, Cbor.ToCbor (Id a), Ord (Id a)) => Item a where
+class (Json.FromJSON a, Cbor.ToCbor (Id a), Ord (Id a)) => Node a where
   type Id a
-  archiveInfo :: a -> ArchiveSiteData
-  itemId :: a -> Id a
+  archiveInfo :: a -> Src.SiteChildNode
+  nodeId :: a -> Id a
   addItemSummary :: Context -> a -> Summary -> Summary
 
 addHtmlContent :: Context -> HtmlContent -> Summary -> Summary
@@ -187,22 +187,22 @@ addHtmlContent Context {ctxContentImages = True} (HtmlContent c) s =
   s {sumContentImages = addContentImage c (sumContentImages s)}
 addHtmlContent Context {ctxContentImages = False} _ s = s
 
-instance Item Api.Answer where
+instance Node Api.Answer where
   type Id Api.Answer = AnswerId
-  archiveInfo ans = AsdAnswer ans.ansAnswerId AAnsInfo
-  itemId = Api.ansAnswerId
+  archiveInfo ans = ScnAnswer ans.ansAnswerId NlNode
+  nodeId = Api.ansAnswerId
   addItemSummary ctx ans = addHtmlContent ctx (Api.ansBody ans)
 
-instance Item Api.Badge where
+instance Node Api.Badge where
   type Id Api.Badge = BadgeId
-  archiveInfo b = AsdBadge b.bBadgeId ABdgInfo
-  itemId = Api.bBadgeId
+  archiveInfo b = ScnBadge b.bBadgeId NlNode
+  nodeId = Api.bBadgeId
   addItemSummary ctx b = addHtmlContent ctx (Api.bDescription b)
 
-instance Item Api.Collective where
+instance Node Api.Collective where
   type Id Api.Collective = CollectiveSlug
-  archiveInfo col = AsdCollective col.colSlug AColInfo
-  itemId = Api.colSlug
+  archiveInfo col = ScnCollective col.colSlug NlNode
+  nodeId = Api.colSlug
   addItemSummary
     Context {ctxContentImages = True}
     Api.Collective {Api.colDescription = RawText t}
@@ -210,300 +210,324 @@ instance Item Api.Collective where
       s {sumContentImages = addContentImage t (sumContentImages s)}
   addItemSummary _ _ s = s
 
-instance Item Api.Comment where
+instance Node Api.Comment where
   type Id Api.Comment = CommentId
-  archiveInfo com = AsdComment com.comCommentId AComInfo
-  itemId = Api.comCommentId
+  archiveInfo com = ScnComment com.comCommentId NlNode
+  nodeId = Api.comCommentId
   addItemSummary ctx c = addHtmlContent ctx (Api.comBody c)
 
-instance Item Api.Question where
+instance Node Api.Question where
   type Id Api.Question = QuestionId
-  archiveInfo q = AsdQuestion q.qQuestionId AQueInfo
-  itemId = Api.qQuestionId
+  archiveInfo q = ScnQuestion q.qQuestionId NlNode
+  nodeId = Api.qQuestionId
   addItemSummary ctx q = addHtmlContent ctx (Api.qBody q)
 
-instance Item Api.Tag where
+instance Node Api.Tag where
   type Id Api.Tag = TagName
-  archiveInfo t = AsdTag t.tagName ATagInfo
-  itemId = Api.tagName
+  archiveInfo t = ScnTag t.tagName NlNode
+  nodeId = Api.tagName
   addItemSummary _ _ s = s
 
-instance Item Api.TagSynonym where
+instance Node Api.TagSynonym where
   type Id Api.TagSynonym = TagName
-  archiveInfo t = AsdTagSynonym t.tagSynFromTag ATSynInfo
-  itemId = Api.tagSynFromTag
+  archiveInfo t = ScnTagSynonym t.tagSynFromTag NlNode
+  nodeId = Api.tagSynFromTag
   addItemSummary _ _ s = s
 
-instance Item Api.TagWiki where
+instance Node Api.TagWiki where
   type Id Api.TagWiki = TagName
-  archiveInfo t = AsdTagWiki t.twTagName ATWkInfo
-  itemId = Api.twTagName
+  archiveInfo t = ScnTagWiki t.twTagName NlNode
+  nodeId = Api.twTagName
   addItemSummary ctx w = addHtmlContent ctx (Api.twBody w)
 
-instance Item Api.User where
+instance Node Api.User where
   type Id Api.User = UserId
-  archiveInfo u = AsdUser u.usrUserId AUsrInfo
-  itemId = Api.usrUserId
+  archiveInfo u = ScnUser u.usrUserId NlNode
+  nodeId = Api.usrUserId
   addItemSummary Context {ctxProfileImages = True} Api.User {Api.usrProfileImage = LinkUrl u} s =
     s {sumProfileImages = addImageUrl u (sumProfileImages s)}
   addItemSummary Context {ctxProfileImages = False} _ s = s
 
-addItem ::
+instance Node Api.Info where
+  type Id Api.Info = ()
+  archiveInfo _ = ScnInfo NlNode
+  nodeId = const ()
+  addItemSummary Context {ctxProfileImages = True} Api.Info {Api.infoSite = obj} s =
+    s
+      { sumProfileImages =
+          let addLink (LinkUrl l) = addImageUrl l
+           in ( addLink (Api.sitIconUrl obj)
+                  . addLink (Api.sitHighResolutionIconUrl obj)
+                  . addLink (Api.sitFaviconUrl obj)
+                  . addLink (Api.sitLogoUrl obj)
+              )
+                s.sumProfileImages
+      }
+  addItemSummary _ _ s = s
+
+addNode ::
   forall a.
-  (Item a) =>
+  (Node a) =>
   Context ->
   Summary ->
-  ItemMeta ->
+  ApiSiteParameter ->
+  NodeMeta ->
   BinJson.WithBinValue a ->
   IO Summary
-addItem ctx s meta (BinJson.WithBinValue bv obj) =
+addNode ctx s site meta (BinJson.WithBinValue bv obj) =
   addItemSummary ctx obj s
-    <$ addApiItem ctx meta (archiveInfo obj) bv
+    <$ addArchiveNode ctx meta (AnSite site (NcChild (archiveInfo obj))) bv
 
-addItemsResp :: forall a. (Item a) => Context -> ItemMeta -> Proxy a -> ByteString -> IO Summary
-addItemsResp ctx meta _ body =
-  Aeson.throwDecodeStrict body >>= \Api.Wrapper {Api.wItems = is} ->
-    V.foldM' (\s v -> addItem @a ctx s meta v) mempty is
+data NodeResp = NodeResp
+  { nrMeta :: NodeMeta,
+    nrNode :: ArchiveNode,
+    nrRequest :: HttpRequest
+  }
 
-data ListArgs = ListArgs
-  { lrMeta :: !ItemMeta,
-    lrFull :: !Bool,
-    lrResponses :: !(V.Vector HttpRequest)
+newtype NodeItem t = NodeItem (BinJson.WithBinValue t)
+
+instance (FromJSON t) => FromJSON (NodeItem t) where
+  parseJSON =
+    withArray
+      "NodeItem"
+      ( \a ->
+          if V.length a == 1
+            then NodeItem <$> parseJSON (V.unsafeHead a)
+            else fail "expect array with one element"
+      )
+
+addNodeResp :: forall a. (Node a) => Context -> Proxy a -> NodeResp -> IO Summary
+addNodeResp ctx _ resp@NodeResp {nrNode = AnSite site _} =
+  Aeson.throwDecodeStrict resp.nrRequest.hrResponse.respBody.jsonBody
+    >>= \Api.Wrapper {Api.wItems = NodeItem bv} ->
+      addNode @a ctx mempty site resp.nrMeta bv
+
+data EdgeResp = EdgeResp
+  { erMeta :: NodeMeta,
+    erEdge :: ArchiveEdge,
+    erFull :: Bool,
+    erRequest :: Vector HttpRequest
   }
 
 data SummaryWithIds i = SummaryWithIds !Summary !(S.Set i)
 
-addItemListResp ::
-  forall a.
-  (Item a) =>
-  Context ->
-  ListArgs ->
-  ArchiveSiteData ->
-  Proxy a ->
-  IO Summary
-addItemListResp ctx (ListArgs meta full resp) archive _ = do
+addEdgeResp :: forall a. (Node a) => Context -> Proxy a -> EdgeResp -> IO Summary
+addEdgeResp ctx _ req = do
+  let (ArchiveEdge (EcChild (AceSite site _))) = req.erEdge
   SummaryWithIds s ids <-
     V.foldM'
       ( \si r ->
           Aeson.throwDecodeStrict r.hrResponse.respBody.jsonBody >>= \w ->
             V.foldM'
-              ( \(SummaryWithIds s i) val@(BinJson.WithBinValue _ obj) ->
+              ( \(SummaryWithIds s ids) node@(BinJson.WithBinValue _ obj) ->
                   fmap
-                    (\updateS -> SummaryWithIds updateS (S.insert (itemId obj) i))
-                    (addItem @a ctx s meta val)
+                    (\updateS -> SummaryWithIds updateS (S.insert (nodeId obj) ids))
+                    (addNode @a ctx s site req.erMeta node)
               )
               si
               (Api.wItems w)
       )
       (SummaryWithIds mempty S.empty)
-      resp
-  addItemList ctx meta archive full ids
+      req.erRequest
+  addArchiveEdge ctx req.erMeta req.erEdge req.erFull ids
   pure s
 
-addRevisionSummary :: Context -> Api.Revision -> Summary -> Summary
-addRevisionSummary Context {ctxContentImages = True} r initS@Summary {sumContentImages = s0} =
-  initS
-    { sumContentImages =
-        ( addContent (Api.revBody r)
-            . addContent (Api.revLastBody r)
-            . addContent (Api.revComment r)
-        )
-          s0
-    }
-  where
-    addContent (Just (HtmlContent c)) s = addContentImage c s
-    addContent Nothing s = s
-addRevisionSummary Context {ctxContentImages = False} _ s = s
-
-data SummaryWithRev = SummaryWithRev !Summary !(M.Map RevisionId [BinJson.BinValue])
-
-addRevisionListResp :: Context -> ListArgs -> ArchiveSiteData -> IO Summary
-addRevisionListResp ctx (ListArgs meta full resp) archive =
-  let SummaryWithRev summary revs =
-        V.foldr'
-          ( \r acc -> case Aeson.eitherDecodeStrict' r.hrResponse.respBody.jsonBody of
-              Right (Api.Wrapper {Api.wItems = is}) ->
-                V.foldr'
-                  ( \(BinJson.WithBinValue bv obj) (SummaryWithRev s mp) ->
-                      SummaryWithRev
-                        (addRevisionSummary ctx obj s)
-                        ( M.alter
-                            ( \case
-                                Just vs -> Just (bv : vs)
-                                Nothing -> Just [bv]
-                            )
-                            (Api.revRevisionGuid obj)
-                            mp
-                        )
-                  )
-                  acc
-                  is
-              Left e -> throw (Aeson.AesonException e)
+addRevision ::
+  Context ->
+  Summary ->
+  ApiSiteParameter ->
+  NodeMeta ->
+  RevisionId ->
+  [BinJson.WithBinValue Api.Revision] ->
+  IO Summary
+addRevision ctx summary site meta rId rs =
+  ( if ctx.ctxContentImages
+      then
+        summary
+          { sumContentImages =
+              foldl'
+                ( \imgs (BinJson.WithBinValue _ obj) ->
+                    ( addContent obj.revBody
+                        . addContent obj.revLastBody
+                        . addContent obj.revComment
+                    )
+                      imgs
+                )
+                summary.sumContentImages
+                rs
+          }
+      else summary
+  )
+    <$ addArchiveNode
+      ctx
+      meta
+      (AnSite site (NcChild (ScnRevision rId NlNode)))
+      ( fmap
+          ( \case
+              BinJson.WithBinValue bv _ -> bv
           )
-          (SummaryWithRev mempty M.empty)
-          resp
-   in do
-        traverse_
-          (\(k, v) -> addApiItem ctx meta (AsdRevision k ARevInfo) v)
-          (M.toAscList revs)
-        addItemList ctx meta archive full (M.keysSet revs)
-        pure summary
-
-newtype Info = Info {infoSite :: BinJson.WithBinValue Api.Site}
-
-Aeson.TH.deriveFromJSON
-  Aeson.TH.defaultOptions {Aeson.TH.fieldLabelModifier = Aeson.camelTo2 '_' . drop 4}
-  ''Info
-
-newtype InfoItem = IInfo Info
-
-instance Aeson.FromJSON InfoItem where
-  parseJSON =
-    Aeson.withArray
-      "info"
-      ( \v ->
-          if V.length v == 1
-            then IInfo <$> Aeson.parseJSON (V.head v)
-            else fail "multi item in site info"
+          rs
       )
+  where
+    addContent (Just (HtmlContent c)) imgs = addContentImage c imgs
+    addContent Nothing imgs = imgs
 
 addEntry :: Context -> LBS.ByteString -> IO Summary
 addEntry ctx bs =
   let entry = Cbor.decodeLazyBsThrow bs
    in case arData entry of
-        RdObjects {rdoType = ty, rdoResponse = resp} -> do
-          apiRespId <-
-            addHttpResponse ctx (arSeq entry) 0 resp >>= \hId ->
+        RdNode {rdnType = ty@(AnSite _ (NcChild child)), rdnResponse = resp} -> do
+          let timestamp = resp.hrRequest.reqTimestamp
+          rId <-
+            addHttpResponse ctx entry.arSeq 0 resp >>= \hId ->
               addApiResponse
                 ctx
-                ApiInfo
-                  { apiFetch = ctxFetchId ctx,
-                    apiCallSeq = arSeq entry,
-                    apiVersion = arApiVersion entry,
-                    apiSite = arSite entry,
-                    apiTimestamp = respTimestamp (hrResponse resp),
-                    apiFilter = arFilter entry,
-                    apiResponse = RdObjects {rdoType = ty, rdoResponse = hId}
+                Src.ApiResponseInfo
+                  { Src.arFetch = ctx.ctxFetchId,
+                    Src.arTimestamp = timestamp,
+                    Src.arSeq = entry.arSeq,
+                    Src.arApi = entry.arApi,
+                    Src.arResponse =
+                      Src.RdNode {Src.rdnType = ty, Src.rdnResponse = hId}
                   }
-          let meta =
-                ItemMeta
-                  { imSite = arSite entry,
-                    imApiResponseId = apiRespId,
-                    imApiVersion = arApiVersion entry,
-                    imFilter = arFilter entry,
-                    imTimestamp = respTimestamp (hrResponse resp)
+          let nodeResp =
+                NodeResp
+                  { nrMeta =
+                      NodeMeta
+                        { nmApiResponseId = rId,
+                          nmApi = entry.arApi,
+                          nmTimestamp = timestamp
+                        },
+                    nrNode = ty,
+                    nrRequest = resp
                   }
-              body = resp.hrResponse.respBody.jsonBody
+          case child of
+            ScnAnswer _ _ -> addNodeResp @Api.Answer ctx Proxy nodeResp
+            ScnBadge _ _ -> addNodeResp @Api.Badge ctx Proxy nodeResp
+            ScnCollective _ _ -> addNodeResp @Api.Collective ctx Proxy nodeResp
+            ScnComment _ _ -> addNodeResp @Api.Comment ctx Proxy nodeResp
+            ScnInfo _ -> addNodeResp @Api.Info ctx Proxy nodeResp
+            ScnQuestion _ _ -> addNodeResp @Api.Question ctx Proxy nodeResp
+            ScnRevision _ _ -> error "revision shouldn't be fetched as node"
+            ScnTag _ _ -> addNodeResp @Api.Tag ctx Proxy nodeResp
+            ScnTagSynonym _ _ -> addNodeResp @Api.TagSynonym ctx Proxy nodeResp
+            ScnTagWiki _ _ -> addNodeResp @Api.TagWiki ctx Proxy nodeResp
+            ScnUser _ _ -> addNodeResp @Api.User ctx Proxy nodeResp
+        RdEdge
+          { rdeType = ty@(ArchiveEdge (EcChild (AceSite _ child))),
+            rdeFull = full,
+            rdeResponses = resps
+          } -> do
+            let timestamp = (V.head resps).hrRequest.reqTimestamp
+            rId <-
+              V.imapM (addHttpResponse ctx entry.arSeq) resps >>= \hIds ->
+                addApiResponse
+                  ctx
+                  Src.ApiResponseInfo
+                    { Src.arFetch = ctx.ctxFetchId,
+                      Src.arTimestamp = timestamp,
+                      Src.arSeq = entry.arSeq,
+                      Src.arApi = entry.arApi,
+                      Src.arResponse =
+                        Src.RdEdge
+                          { Src.rdeType = ty,
+                            Src.rdeFull = full,
+                            Src.rdeResponses = hIds
+                          }
+                    }
+            let edgeResp =
+                  EdgeResp
+                    { erMeta =
+                        NodeMeta
+                          { nmApiResponseId = rId,
+                            nmApi = entry.arApi,
+                            nmTimestamp = timestamp
+                          },
+                      erEdge = ty,
+                      erFull = full,
+                      erRequest = resps
+                    }
+            case child of
+              EbChild c -> case c of
+                SceAnswer _ (ElEdge a) -> case a of
+                  AnsComment -> addEdgeResp @Api.Comment ctx Proxy edgeResp
+                  AnsRevision -> error "revision list shouldn't be fetched as edge"
+                SceCollective _ (ElEdge col) -> case col of
+                  ColAnswer -> addEdgeResp @Api.Answer ctx Proxy edgeResp
+                  ColQuestion -> addEdgeResp @Api.Question ctx Proxy edgeResp
+                  ColTag -> addEdgeResp @Api.Tag ctx Proxy edgeResp
+                  ColUser -> addEdgeResp @Api.User ctx Proxy edgeResp
+                SceQuestion _ (ElEdge q) -> case q of
+                  QueAnswer -> addEdgeResp @Api.Answer ctx Proxy edgeResp
+                  QueComment -> addEdgeResp @Api.Comment ctx Proxy edgeResp
+                  QueRevision -> error "revision list shouldn't be fetched as edge"
+                SceTag _ (ElEdge t) -> case t of
+                  TTagSynonym -> addEdgeResp @Api.TagSynonym ctx Proxy edgeResp
+                SceUser _ (ElEdge u) -> case u of
+                  UsrAnswer -> addEdgeResp @Api.Answer ctx Proxy edgeResp
+                  UsrBadge -> addEdgeResp @Api.Badge ctx Proxy edgeResp
+                  UsrComment -> addEdgeResp @Api.Comment ctx Proxy edgeResp
+                  UsrQuestion -> addEdgeResp @Api.Question ctx Proxy edgeResp
+              EbEdge e -> case e of
+                SitBadge -> addEdgeResp @Api.Badge ctx Proxy edgeResp
+                SitTag -> addEdgeResp @Api.Tag ctx Proxy edgeResp
+        RdRevision {rdrType = ty, rdrResponses = resps} -> do
+          let timestamp = (V.head resps).hrRequest.reqTimestamp
+          rId <-
+            V.imapM (addHttpResponse ctx entry.arSeq) resps >>= \hIds ->
+              addApiResponse
+                ctx
+                ApiResponseInfo
+                  { Src.arFetch = ctx.ctxFetchId,
+                    Src.arSeq = entry.arSeq,
+                    Src.arApi = entry.arApi,
+                    Src.arTimestamp = timestamp,
+                    Src.arResponse = RdRevision ty hIds
+                  }
+          items <-
+            V.mapM
+              ( \r ->
+                  Api.wItems @(V.Vector (BinJson.WithBinValue Api.Revision))
+                    <$> Aeson.throwDecodeStrict r.hrResponse.respBody.jsonBody
+              )
+              resps
+          let nodeMeta =
+                NodeMeta
+                  { nmApiResponseId = rId,
+                    nmApi = entry.arApi,
+                    nmTimestamp = timestamp
+                  }
           case ty of
-            OtAnswer -> addItemsResp @Api.Answer ctx meta Proxy body
-            OtBadge -> addItemsResp @Api.Badge ctx meta Proxy body
-            OtCollective -> addItemsResp @Api.Collective ctx meta Proxy body
-            OtComment -> addItemsResp @Api.Comment ctx meta Proxy body
-            OtInfo -> do
-              Api.Wrapper {Api.wItems = IInfo (Info {infoSite = BinJson.WithBinValue bv obj})} <-
-                Aeson.throwDecodeStrict body
-              addApiItem ctx meta AsdInfo bv
-              pure
-                ( if ctx.ctxProfileImages
-                    then
-                      Summary
-                        { sumContentImages = mempty,
-                          sumProfileImages =
-                            let addLink (LinkUrl l) = addImageUrl l
-                             in ( addLink (Api.sitIconUrl obj)
-                                    . addLink (Api.sitHighResolutionIconUrl obj)
-                                    . addLink (Api.sitFaviconUrl obj)
-                                    . addLink (Api.sitLogoUrl obj)
-                                )
-                                  mempty
-                        }
-                    else mempty
-                )
-            OtQuestion -> addItemsResp @Api.Question ctx meta Proxy body
-            OtRevision -> error "revision must be in api list"
-            OtTag -> addItemsResp @Api.Tag ctx meta Proxy body
-            OtTagSynonym -> addItemsResp @Api.TagSynonym ctx meta Proxy body
-            OtTagWiki -> addItemsResp @Api.TagWiki ctx meta Proxy body
-            OtUser -> addItemsResp @Api.User ctx meta Proxy body
-        RdList {rdlRequest = req, rdlFull = f, rdlResponses = resp} -> do
-          let timestamp = respTimestamp (hrResponse (V.head resp))
-          apiRespId <-
-            V.imapM (addHttpResponse ctx (arSeq entry)) resp >>= \hId ->
-              addApiResponse
-                ctx
-                ApiInfo
-                  { apiFetch = ctxFetchId ctx,
-                    apiCallSeq = arSeq entry,
-                    apiVersion = arApiVersion entry,
-                    apiSite = arSite entry,
-                    apiTimestamp = timestamp,
-                    apiFilter = arFilter entry,
-                    apiResponse =
-                      RdList
-                        { rdlRequest = req,
-                          rdlFull = f,
-                          rdlResponses = hId
-                        }
-                  }
-          let meta =
-                ItemMeta
-                  { imSite = arSite entry,
-                    imApiResponseId = apiRespId,
-                    imApiVersion = arApiVersion entry,
-                    imFilter = arFilter entry,
-                    imTimestamp = timestamp
-                  }
-              args =
-                ListArgs
-                  { lrMeta = meta,
-                    lrFull = f,
-                    lrResponses = resp
-                  }
-          case req of
-            LrAnswer {lraId = aId, lraRequest = aReq} ->
-              case aReq of
-                AlComment -> addItemListResp @Api.Comment ctx args (AsdAnswer aId AAnsComment) Proxy
-                AlRevision -> addRevisionListResp ctx args (AsdAnswer aId AAnsRevision)
-            LrCollective {lrcId = cId, lrcRequest = cReq} ->
-              case cReq of
-                ClAnswer -> addItemListResp @Api.Answer ctx args (AsdCollective cId AColAnswer) Proxy
-                ClQuestion -> addItemListResp @Api.Question ctx args (AsdCollective cId AColQuestion) Proxy
-                ClTag -> addItemListResp @Api.Tag ctx args (AsdCollective cId AColTag) Proxy
-                ClUser -> addItemListResp @Api.User ctx args (AsdCollective cId AColUser) Proxy
-            LrListRevision revId
-              | f ->
-                  let content =
-                        V.concatMap
-                          ( \r ->
-                              case Aeson.eitherDecodeStrict r.hrResponse.respBody.jsonBody of
-                                Right Api.Wrapper {Api.wItems = is} -> (is :: V.Vector (BinJson.WithBinValue Api.Revision))
-                                Left e -> throw (Aeson.AesonException e)
-                          )
-                          resp
-                   in V.foldl'
-                        (\s (BinJson.WithBinValue _ r) -> addRevisionSummary ctx r s)
-                        mempty
-                        content
-                        <$ addApiItem
-                          ctx
-                          meta
-                          (AsdRevision revId ARevInfo)
-                          (V.map (\(BinJson.WithBinValue bv _) -> bv) content)
-              | otherwise -> error "incomplete revision"
-            LrQuestion {lrqId = qId, lrqRequest = qReq} ->
-              case qReq of
-                QlAnswer -> addItemListResp @Api.Answer ctx args (AsdQuestion qId AQueAnswer) Proxy
-                QlComment -> addItemListResp @Api.Comment ctx args (AsdQuestion qId AQueComment) Proxy
-                QlRevision -> addRevisionListResp ctx args (AsdQuestion qId AQueRevision)
-            LrTag {lrtId = tId, lrtRequest = tReq} ->
-              case tReq of
-                TlTagSynonym -> addItemListResp @Api.TagSynonym ctx args (AsdTag tId ATagSynonym) Proxy
-            LrUser {lruId = u, lruRequest = uReq} ->
-              case uReq of
-                UlAnswer -> addItemListResp @Api.Answer ctx args (AsdUser u AUsrAnswer) Proxy
-                UlBadge -> addItemListResp @Api.Badge ctx args (AsdUser u AUsrBadge) Proxy
-                UlComment -> addItemListResp @Api.Comment ctx args (AsdUser u AUsrComment) Proxy
-                UlQuestion -> addItemListResp @Api.Question ctx args (AsdUser u AUsrQuestion) Proxy
+            ANode (AnSite site (NcChild (ScnRevision revId _))) ->
+              addRevision ctx mempty site nodeMeta revId (concatMap V.toList items)
+            ANode _ -> error "invalid revision node type"
+            AEdge edgeTy@(ArchiveEdge (EcChild (AceSite site _))) -> do
+              let revMap =
+                    V.foldr'
+                      ( \revs mp0 ->
+                          V.foldr'
+                            ( \bv@(BinJson.WithBinValue _ rev) ->
+                                M.alter
+                                  ( \case
+                                      Just bvs -> Just (bv : bvs)
+                                      Nothing -> Just [bv]
+                                  )
+                                  rev.revRevisionGuid
+                            )
+                            mp0
+                            revs
+                      )
+                      M.empty
+                      items
+              summary <-
+                M.foldlWithKey'
+                  ( \m revId rev ->
+                      m >>= \s -> addRevision ctx s site nodeMeta revId rev
+                  )
+                  (pure mempty)
+                  revMap
+              addArchiveEdge ctx nodeMeta edgeTy True (M.keysSet revMap)
+              pure summary
 
 withDataStore :: FilePath -> FilePath -> (BlobStore -> IO c) -> IO c
 withDataStore root serverRoot f =
@@ -547,7 +571,7 @@ main = do
                   args.argStoreRoot
                   args.argServerRoot
                   ( \os -> do
-                      fetchId <- OS.addObject os (OtRecord (RtApiRequest RrFetch)) (Version 1 0) f.fInfo
+                      fetchId <- OS.addObject os (OtRecord (RtRestApi RrFetch)) (Version 1 0) f.fInfo
                       let context =
                             Context
                               { ctxDataStore = ds,

@@ -1,7 +1,7 @@
 use hex_literal::hex;
 
 use webar_core::digest::{Digest, Sha256};
-use webar_stackexchange_core::api::filter::{FilterId, FilterSpec, TypeMap};
+use webar_stackexchange_core::rest_api::filter::{FilterId, FilterSpec, TypeMap};
 
 pub const HS_FILTER_INFO: TypeMap<FilterSpec<&str>> = TypeMap {
     answer: FilterSpec {
