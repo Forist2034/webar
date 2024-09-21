@@ -53,15 +53,6 @@ impl<Addr: Copy> ResponseData<Addr> {
                 full: *full,
                 responses: response.iter().map(HttpRequest::to_meta).collect(),
             },
-            Self::Collection {
-                ty,
-                full,
-                responses: response,
-            } => source::ResponseData::Collection {
-                ty: *ty,
-                full: *full,
-                responses: response.iter().map(HttpRequest::to_meta).collect(),
-            },
         }
     }
 }

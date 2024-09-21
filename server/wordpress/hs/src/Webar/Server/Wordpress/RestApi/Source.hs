@@ -1,16 +1,26 @@
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Webar.Server.Wordpress.RestApi.Source
   ( -- * Archive
-    ArchiveBlogNode (..),
-    ArchiveNode (..),
-    ArchivePageEdge (..),
-    ArchivePostEdge (..),
-    ArchiveBlogEdge (..),
-    ArchiveEdge (..),
-    ArchiveBlogCollection (..),
-    ArchiveCollection (..),
     Archive (..),
+
+    -- ** node
+    NodeLeaf (..),
+    NodeChild (..),
+    BlogChildNode (..),
+    ArchiveNode (..),
+
+    -- ** edge
+    EdgeLeaf (..),
+    EdgeChild (..),
+    EdgeBranch (..),
+    PostEdge (..),
+    BlogChildEdge (..),
+    BlogEdge (..),
+    ArchiveChildEdge (..),
+    ArchiveSelfEdge (..),
+    ArchiveEdge (..),
 
     -- * Request
     RequestRecord (..),
@@ -39,14 +49,15 @@ module Webar.Server.Wordpress.RestApi.Source
     SnapshotInfo (..),
     NodeInfo,
     EdgeInfo,
-    CollectionInfo,
   )
 where
 
 import Data.Vector (Vector)
 import Data.Word (Word32)
 import Webar.Blob (BlobId)
+import Webar.Data.Cbor (FromCbor, ToCbor)
 import Webar.Data.Cbor.TH
+import Webar.Data.Json (FromJSON, ToJSON)
 import Webar.Data.TH
 import qualified Webar.Fetch.Http as F
 import qualified Webar.Http as H
@@ -56,54 +67,70 @@ import Webar.Server.Wordpress.RestApi.Types (ApiInfo)
 import Webar.Server.Wordpress.Types
 import Webar.Types (Timestamp)
 
-data ArchiveBlogNode
-  = AnCategory CategoryId
-  | AnComment CommentId
-  | AnMedia MediaId
-  | AnPage PageId
-  | AnPageRevision PageId PageRevisionId
-  | AnPost PostId
-  | AnPostRevision PostId PostRevisionId
-  | AnTag TagId
+data NodeLeaf = NlNode
+  deriving (Show, Eq)
+
+newtype NodeChild c = NcChild c
+  deriving (Show, Eq)
+
+data BlogChildNode
+  = BcnCategory CategoryId {-# UNPACK #-} NodeLeaf
+  | BcnComment CommentId {-# UNPACK #-} NodeLeaf
+  | BcnMedia MediaId {-# UNPACK #-} NodeLeaf
+  | BcnPage PageId {-# UNPACK #-} NodeLeaf
+  | BcnPost PostId {-# UNPACK #-} NodeLeaf
+  | BcnTag TagId {-# UNPACK #-} NodeLeaf
   deriving (Show, Eq)
 
 data ArchiveNode
-  = AnBlog Address ArchiveBlogNode
-  | AnUser UserId
+  = AnBlog Address (NodeChild BlogChildNode)
+  | AnUser UserId {-# UNPACK #-} NodeLeaf
   deriving (Show, Eq)
 
-data ArchivePageEdge = APageRevision
+$( concat
+     <$> traverse
+       ( \(n, c) ->
+           deriveSumData
+             defaultSumOptions {constructorTagModifier = camelTo2 '_' . drop c}
+             n
+       )
+       [ (''NodeLeaf, 2),
+         (''NodeChild, 2),
+         (''BlogChildNode, 3),
+         (''ArchiveNode, 2)
+       ]
+ )
+
+newtype EdgeLeaf e = ElEdge e
   deriving (Show, Eq)
 
-data ArchivePostEdge = APostComment | APostRevision
+newtype EdgeChild c = EcChild c
   deriving (Show, Eq)
 
-data ArchiveBlogEdge
-  = AePage PageId {-# UNPACK #-} ArchivePageEdge
-  | AePost PostId ArchivePostEdge
+data EdgeBranch e c = EbEdge e | EbChild c
   deriving (Show, Eq)
 
-data ArchiveEdge = AeBlog Address ArchiveBlogEdge
+data PostEdge = APostComment
   deriving (Show, Eq)
 
-data ArchiveBlogCollection
-  = AcCategory
-  | AcComment
-  | AcMedia
-  | AcPage
-  | AcPost
-  | AcTag
+data BlogChildEdge
+  = BcePost PostId (EdgeLeaf PostEdge)
   deriving (Show, Eq)
 
-data ArchiveCollection
-  = AcBlog Address ArchiveBlogCollection
-  | AcUser
+data BlogEdge
+  = BeCategory
+  | BeComment
+  | BeMedia
+  | BePage
+  | BePost
+  | BeTag
   deriving (Show, Eq)
 
-data Archive
-  = ANode ArchiveNode
-  | AEdge ArchiveEdge
-  | ACollection ArchiveCollection
+data ArchiveChildEdge
+  = AceBlog Address (EdgeBranch BlogEdge BlogChildEdge)
+  deriving (Show, Eq)
+
+data ArchiveSelfEdge = AseUser
   deriving (Show, Eq)
 
 $( concat
@@ -111,17 +138,28 @@ $( concat
        ( \(n, c) ->
            deriveSumData defaultSumOptions {constructorTagModifier = camelTo2 '_' . drop c} n
        )
-       [ (''ArchiveBlogNode, 2),
-         (''ArchiveNode, 2),
-         (''ArchivePageEdge, 5),
-         (''ArchivePostEdge, 5),
-         (''ArchiveBlogEdge, 2),
-         (''ArchiveEdge, 2),
-         (''ArchiveBlogCollection, 2),
-         (''ArchiveCollection, 2),
-         (''Archive, 1)
+       [ (''EdgeLeaf, 2),
+         (''EdgeChild, 2),
+         (''EdgeBranch, 2),
+         (''PostEdge, 5),
+         (''BlogChildEdge, 3),
+         (''BlogEdge, 2),
+         (''ArchiveChildEdge, 3),
+         (''ArchiveSelfEdge, 3)
        ]
  )
+
+newtype ArchiveEdge = ArchiveEdge (EdgeBranch ArchiveSelfEdge ArchiveChildEdge)
+  deriving (Show, Eq, FromCbor, ToCbor, FromJSON, ToJSON)
+
+data Archive
+  = ANode ArchiveNode
+  | AEdge ArchiveEdge
+  deriving (Show, Eq)
+
+deriveSumData
+  defaultSumOptions {constructorTagModifier = camelTo2 '_' . tail}
+  ''Archive
 
 data RequestRecord = RrFetch | RrHttpRequest | RrApiResponse
   deriving (Show, Eq)
@@ -161,11 +199,6 @@ data ResponseData r
       { rdeType :: ArchiveEdge,
         rdeFull :: Bool,
         rdeResponses :: Vector r
-      }
-  | RdCollection
-      { rdcType :: ArchiveCollection,
-        rdcFull :: Bool,
-        rdcResponses :: Vector r
       }
   deriving (Show)
 
@@ -239,5 +272,3 @@ deriveProdData
 type NodeInfo t = SnapshotInfo (NodeContent t)
 
 type EdgeInfo t = SnapshotInfo (SetContent t)
-
-type CollectionInfo t = SnapshotInfo (SetContent t)

@@ -3,9 +3,7 @@ use serde::Deserialize;
 use webar_core::http;
 use webar_data::ser::Serialize;
 
-use crate::id::{
-    CategoryId, CommentId, MediaId, PageId, PageRevisionId, PostId, PostRevisionId, TagId, UserId,
-};
+use crate::id::{CategoryId, CommentId, MediaId, PageId, PostId, TagId, UserId};
 
 macro_rules! archive {
     (enum $i:ident { $($r:ident = $v:literal,)+ }) => {
@@ -17,61 +15,69 @@ macro_rules! archive {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ArchiveBlogNode {
-    #[serde(rename = "category")]
-    Category(CategoryId),
-    #[serde(rename = "comment")]
-    Comment(CommentId),
-    #[serde(rename = "media")]
-    Media(MediaId),
-    #[serde(rename = "page")]
-    Page(PageId),
-    #[serde(rename = "page_revision")]
-    PageRevision(PageId, PageRevisionId),
-    #[serde(rename = "post")]
-    Post(PostId),
-    #[serde(rename = "post_revision")]
-    PostRevision(PostId, PostRevisionId),
-    #[serde(rename = "tag")]
-    Tag(TagId),
+pub enum NodeLeaf {
+    #[serde(rename = "node")]
+    Node,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NodeChild<C> {
+    #[serde(rename = "child")]
+    Child(C),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BlogChildNode {
+    #[serde(rename = "category")]
+    Category(CategoryId, NodeLeaf),
+    #[serde(rename = "comment")]
+    Comment(CommentId, NodeLeaf),
+    #[serde(rename = "media")]
+    Media(MediaId, NodeLeaf),
+    #[serde(rename = "page")]
+    Page(PageId, NodeLeaf),
+    #[serde(rename = "post")]
+    Post(PostId, NodeLeaf),
+    #[serde(rename = "tag")]
+    Tag(TagId, NodeLeaf),
+}
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ArchiveNode<Addr> {
     #[serde(rename = "blog")]
-    Blog(Addr, ArchiveBlogNode),
+    Blog(Addr, NodeChild<BlogChildNode>),
     #[serde(rename = "user")]
-    User(UserId),
+    User(UserId, NodeLeaf),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EdgeLeaf<E> {
+    #[serde(rename = "edge")]
+    Edge(E),
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EdgeChild<C> {
+    #[serde(rename = "child")]
+    Child(C),
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EdgeBranch<E, C> {
+    #[serde(rename = "edge")]
+    Edge(E),
+    #[serde(rename = "child")]
+    Child(C),
 }
 
 archive!(
-    enum ArchivePageEdge {
-        Revision = "revision",
-    }
-);
-archive!(
-    enum ArchivePostEdge {
+    enum PostEdge {
         Comment = "comment",
-        Revision = "revision",
     }
 );
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ArchiveBlogEdge {
-    #[serde(rename = "page")]
-    Page(PageId, ArchivePageEdge),
+pub enum BlogChildEdge {
     #[serde(rename = "post")]
-    Post(PostId, ArchivePostEdge),
+    Post(PostId, EdgeLeaf<PostEdge>),
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ArchiveEdge<Addr> {
-    #[serde(rename = "blog")]
-    Blog(Addr, ArchiveBlogEdge),
-}
-
 archive!(
-    enum ArchiveBlogCollection {
+    enum BlogEdge {
         Category = "category",
         Comment = "comment",
         Media = "media",
@@ -82,12 +88,19 @@ archive!(
 );
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ArchiveCollection<Addr> {
+pub enum ArchiveChildEdge<Addr> {
     #[serde(rename = "blog")]
-    Blog(Addr, ArchiveBlogCollection),
-    #[serde(rename = "user")]
-    User,
+    Blog(Addr, EdgeBranch<BlogEdge, BlogChildEdge>),
 }
+archive!(
+    enum ArchiveSelfEdge {
+        User = "user",
+    }
+);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ArchiveEdge<Addr>(pub EdgeBranch<ArchiveSelfEdge, ArchiveChildEdge<Addr>>);
 
 pub use http::RequestId;
 
@@ -106,13 +119,6 @@ pub enum ResponseData<Addr, R> {
     Edge {
         #[serde(rename = "type")]
         ty: ArchiveEdge<Addr>,
-        full: bool,
-        responses: Vec<R>,
-    },
-    #[serde(rename = "collection")]
-    Collection {
-        #[serde(rename = "type")]
-        ty: ArchiveCollection<Addr>,
         full: bool,
         responses: Vec<R>,
     },

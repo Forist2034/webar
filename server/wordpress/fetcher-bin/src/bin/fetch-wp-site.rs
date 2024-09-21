@@ -9,8 +9,9 @@ use uuid::Uuid;
 use webar_core::{Domain, Host};
 use webar_wordpress_core::Address;
 use webar_wordpress_fetcher::{
-    client::{self, ApiBase},
-    Error, Handler, PageIter,
+    client,
+    handler::{ApiBase, Handler},
+    EdgeIter, Error,
 };
 use webar_wordpress_fetcher_bin::FileFetcher;
 
@@ -120,21 +121,21 @@ fn fetch_site(fetcher: &mut FileFetcher, site: &Site) -> Result<()> {
         },
     };
 
-    fn get_all<O: DeserializeOwned>(iter: PageIter<O>) -> std::result::Result<(), client::Error> {
+    fn get_all<O: DeserializeOwned>(iter: EdgeIter<O>) -> std::result::Result<(), client::Error> {
         for o in iter {
             o?;
         }
         Ok(())
     }
-    fetcher.with_page_iter(handle.list_pages(), 0, get_all)?;
+    fetcher.with_edge_iter(handle.list_pages(), 0, get_all)?;
 
-    fetcher.with_page_iter(handle.list_posts(), 0, get_all)?;
+    fetcher.with_edge_iter(handle.list_posts(), 0, get_all)?;
 
-    fetcher.with_page_iter(handle.list_categories(), 0, get_all)?;
+    fetcher.with_edge_iter(handle.list_categories(), 0, get_all)?;
 
-    fetcher.with_page_iter(handle.list_tags(), 0, get_all)?;
+    fetcher.with_edge_iter(handle.list_tags(), 0, get_all)?;
 
-    match fetcher.with_page_iter(handle.list_media(), 0, get_all) {
+    match fetcher.with_edge_iter(handle.list_media(), 0, get_all) {
         Ok(()) => (),
         Err(Error::Inner(client::Error::Http(e)))
             if e.status() == Some(reqwest::StatusCode::UNAUTHORIZED) =>
@@ -145,7 +146,7 @@ fn fetch_site(fetcher: &mut FileFetcher, site: &Site) -> Result<()> {
     }
 
     if site.list_users {
-        fetcher.with_page_iter(handle.list_users(), 0, get_all)?;
+        fetcher.with_edge_iter(handle.list_users(), 0, get_all)?;
     }
 
     Ok(())

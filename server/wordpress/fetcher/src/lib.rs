@@ -1,8 +1,12 @@
-pub mod client;
 use std::{convert::Infallible, io::Write, iter::FusedIterator};
 
-pub use client::{Client, Handler};
 use serde::de::DeserializeOwned;
+
+pub mod handler;
+pub use handler::Handler;
+
+pub mod client;
+pub use client::Client;
 
 pub mod sink;
 
@@ -26,17 +30,17 @@ pub struct PagedData<O> {
     pub data: Vec<O>,
     pub paging: client::Paging,
 }
-pub struct PageIter<'a, 's, 'h, O> {
-    req: &'a mut client::PageReq<'s, 'h, O>,
+pub struct EdgeIter<'a, 's, 'h, O> {
+    req: &'a mut handler::EdgeReq<'s, 'h, O>,
     client: &'a client::Client,
     has_more: &'a mut bool,
     offset: usize,
 }
-impl<'a, 's, 'h, O: DeserializeOwned> Iterator for PageIter<'a, 's, 'h, O> {
+impl<'a, 's, 'h, O: DeserializeOwned> Iterator for EdgeIter<'a, 's, 'h, O> {
     type Item = Result<PagedData<O>, client::Error>;
     fn next(&mut self) -> Option<Self::Item> {
         if *self.has_more {
-            let (data, paging) = match self.client.request_page(self.req, self.offset) {
+            let (data, paging) = match self.client.request_edge(self.req, self.offset) {
                 Ok(v) => v,
                 Err(e) => return Some(Err(e)),
             };
@@ -53,12 +57,12 @@ impl<'a, 's, 'h, O: DeserializeOwned> Iterator for PageIter<'a, 's, 'h, O> {
         }
     }
 }
-impl<'a, 's, 'h, O: DeserializeOwned> FusedIterator for PageIter<'a, 's, 'h, O> {}
+impl<'a, 's, 'h, O: DeserializeOwned> FusedIterator for EdgeIter<'a, 's, 'h, O> {}
 
 impl<MW: Write, RW: Write> Fetcher<MW, RW> {
     pub fn fetch_node<O: DeserializeOwned>(
         &mut self,
-        req: client::NodeReq<O>,
+        req: handler::NodeReq<O>,
     ) -> Result<O, Error<Infallible>> {
         let _span =
             tracing::info_span!("fetch_node", node = tracing::field::debug(&req.ty)).entered();
@@ -68,16 +72,16 @@ impl<MW: Write, RW: Write> Fetcher<MW, RW> {
         self.sink.add_response(&ret.response).map_err(Error::Sink)?;
         Ok(ret.parsed)
     }
-    pub fn with_page_iter<T, E, O: DeserializeOwned>(
+    pub fn with_edge_iter<T, E, O: DeserializeOwned>(
         &mut self,
-        mut req: client::PageReq<O>,
+        mut req: handler::EdgeReq<O>,
         offset: usize,
-        f: impl FnOnce(PageIter<O>) -> Result<T, E>,
+        f: impl FnOnce(EdgeIter<O>) -> Result<T, E>,
     ) -> Result<T, Error<E>> {
         let _span =
             tracing::info_span!("fetch_page", ty = tracing::field::debug(&req.ty)).entered();
         let mut has_more = true;
-        let ret = f(PageIter {
+        let ret = f(EdgeIter {
             req: &mut req,
             client: &self.client,
             has_more: &mut has_more,

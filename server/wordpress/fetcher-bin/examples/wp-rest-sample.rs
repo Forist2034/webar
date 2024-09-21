@@ -7,8 +7,9 @@ use serde::de::DeserializeOwned;
 use webar_core::{Domain, Host};
 use webar_wordpress_core::{id::PostId, Address};
 use webar_wordpress_fetcher::{
-    client::{self, ApiBase, Config},
-    Fetcher, Handler, PageIter,
+    client::{self, Config},
+    handler::{ApiBase, Handler},
+    EdgeIter, Fetcher,
 };
 use webar_wordpress_fetcher_bin::FileWriter;
 
@@ -30,7 +31,7 @@ struct Args {
     dest: String,
 }
 
-fn list_all<O: DeserializeOwned>(it: PageIter<O>) -> Result<(), client::Error> {
+fn list_all<O: DeserializeOwned>(it: EdgeIter<O>) -> Result<(), client::Error> {
     for r in it.take(2) {
         r?;
     }
@@ -49,7 +50,7 @@ fn run(fetcher: &mut Fetcher<FileWriter, FileWriter>, depth: Depth) -> Result<()
             .context("failed to get post")?;
     }
     let posts = fetcher
-        .with_page_iter(
+        .with_edge_iter(
             handler.list_posts(),
             0,
             |mut it| -> Result<_, client::Error> {
@@ -68,23 +69,23 @@ fn run(fetcher: &mut Fetcher<FileWriter, FileWriter>, depth: Depth) -> Result<()
             //     .with_page_iter(h.list_revisions(), 0, list_all)
             //     .context("failed to get post revisions")?;
             fetcher
-                .with_page_iter(h.list_comments(), 0, list_all)
+                .with_edge_iter(h.list_comments(), 0, list_all)
                 .context("failed to get post comments")?;
         }
         fetcher
-            .with_page_iter(handler.list_comments(), 0, list_all)
+            .with_edge_iter(handler.list_comments(), 0, list_all)
             .context("failed to get comments")?;
         fetcher
-            .with_page_iter(handler.list_media(), 0, list_all)
+            .with_edge_iter(handler.list_media(), 0, list_all)
             .context("failed to get media")?;
         fetcher
-            .with_page_iter(handler.list_categories(), 0, list_all)
+            .with_edge_iter(handler.list_categories(), 0, list_all)
             .context("failed to get categories")?;
         fetcher
-            .with_page_iter(handler.list_tags(), 0, list_all)
+            .with_edge_iter(handler.list_tags(), 0, list_all)
             .context("failed to get tags")?;
         fetcher
-            .with_page_iter(handler.list_users(), 0, list_all)
+            .with_edge_iter(handler.list_users(), 0, list_all)
             .context("failed to get users")?;
     }
     Ok(())

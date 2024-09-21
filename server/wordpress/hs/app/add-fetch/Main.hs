@@ -130,13 +130,13 @@ addArchiveNode ctx meta archive bv =
           siContent = NcNormal dat.blobId
         }
 
-addArchiveSet :: (Cbor.ToCbor a) => Context -> NodeMeta -> Src.Archive -> Src.SnapshotType -> Bool -> S.Set a -> IO ()
-addArchiveSet ctx meta archive ty full v =
+addArchiveEdge :: (Cbor.ToCbor a) => Context -> NodeMeta -> Src.ArchiveEdge -> Bool -> S.Set a -> IO ()
+addArchiveEdge ctx meta archive full v =
   DS.addBlob ctx.ctxDataStore (SetData (CborData (Cbor.encodeStrictBs v))) >>= \dat ->
     addSnapshot
       ctx
-      archive
-      ty
+      (Src.AEdge archive)
+      (Src.StEdge Src.SeSet)
       SnapshotInfo
         { siFetch = ctx.ctxFetchId,
           siApiResponse = meta.nmApiResponseId,
@@ -154,55 +154,43 @@ class (Json.FromJSON n, Cbor.ToCbor (Id n), Ord (Id n)) => Node n where
 instance Node Api.Category where
   type Addr Api.Category = Address
   type Id Api.Category = CategoryId
-  archiveNode a c = Src.AnBlog a (Src.AnCategory c.catId)
+  archiveNode a c = Src.AnBlog a (NcChild (Src.BcnCategory c.catId NlNode))
   nodeId c = c.catId
 
 instance Node Api.Comment where
   type Addr Api.Comment = Address
   type Id Api.Comment = CommentId
-  archiveNode a c = Src.AnBlog a (Src.AnComment c.comId)
+  archiveNode a c = Src.AnBlog a (NcChild (Src.BcnComment c.comId NlNode))
   nodeId c = c.comId
 
 instance Node Api.Media where
   type Addr Api.Media = Address
   type Id Api.Media = MediaId
-  archiveNode a m = Src.AnBlog a (Src.AnMedia m.medId)
+  archiveNode a m = Src.AnBlog a (NcChild (Src.BcnMedia m.medId NlNode))
   nodeId m = m.medId
 
 instance Node Api.Page where
   type Addr Api.Page = Address
   type Id Api.Page = PageId
-  archiveNode a p = Src.AnBlog a (Src.AnPage p.pageId)
+  archiveNode a p = Src.AnBlog a (NcChild (Src.BcnPage p.pageId NlNode))
   nodeId p = p.pageId
-
-instance Node Api.PageRevision where
-  type Addr Api.PageRevision = Address
-  type Id Api.PageRevision = PageRevisionId
-  archiveNode a p = Src.AnBlog a (Src.AnPageRevision p.pagRevParent p.pagRevId)
-  nodeId p = p.pagRevId
 
 instance Node Api.Post where
   type Addr Api.Post = Address
   type Id Api.Post = PostId
-  archiveNode a p = Src.AnBlog a (Src.AnPost p.postId)
+  archiveNode a p = Src.AnBlog a (NcChild (Src.BcnPost p.postId NlNode))
   nodeId p = p.postId
-
-instance Node Api.PostRevision where
-  type Addr Api.PostRevision = Address
-  type Id Api.PostRevision = PostRevisionId
-  archiveNode a p = Src.AnBlog a (Src.AnPostRevision p.pRevParent p.pRevId)
-  nodeId p = p.pRevId
 
 instance Node Api.Tag where
   type Addr Api.Tag = Address
   type Id Api.Tag = TagId
-  archiveNode a t = Src.AnBlog a (Src.AnTag t.tagId)
+  archiveNode a t = Src.AnBlog a (NcChild (Src.BcnTag t.tagId NlNode))
   nodeId t = t.tagId
 
 instance Node Api.User where
   type Addr Api.User = ()
   type Id Api.User = UserId
-  archiveNode _ u = Src.AnUser u.usrId
+  archiveNode _ u = Src.AnUser u.usrId NlNode
   nodeId u = u.usrId
 
 addNode :: (Node a) => Context -> NodeMeta -> Addr a -> BinJson.WithBinValue a -> IO ()
@@ -220,14 +208,15 @@ addNodeResp ctx _ resp =
   Aeson.throwDecodeStrict @(BinJson.WithBinValue a) resp.nrRequest.hrResponse.respBody.jsonBody
     >>= \(BinJson.WithBinValue bv _) -> addArchiveNode ctx resp.nrMeta resp.nrNode bv
 
-data SetResp = SetResp
-  { srMeta :: NodeMeta,
-    srFull :: Bool,
-    srRequest :: Vector HttpRequest
+data EdgeResp = EdgeResp
+  { erEdge :: Src.ArchiveEdge,
+    erMeta :: NodeMeta,
+    erFull :: Bool,
+    erRequest :: Vector HttpRequest
   }
 
-addSetResp :: forall a. (Node a) => Context -> Src.Archive -> Src.SnapshotType -> Proxy a -> Addr a -> SetResp -> IO ()
-addSetResp ctx archive st _ addr req = do
+addEdgeResp :: forall a. (Node a) => Context -> Proxy a -> Addr a -> EdgeResp -> IO ()
+addEdgeResp ctx _ addr req = do
   ids <-
     V.foldM'
       ( \si r ->
@@ -235,20 +224,14 @@ addSetResp ctx archive st _ addr req = do
             V.foldM'
               ( \ids node@(BinJson.WithBinValue _ obj) ->
                   S.insert (nodeId obj) ids
-                    <$ addNode @a ctx req.srMeta addr node
+                    <$ addNode @a ctx req.erMeta addr node
               )
               si
               nodes
       )
       S.empty
-      req.srRequest
-  addArchiveSet ctx req.srMeta archive st req.srFull ids
-
-addEdgeResp :: (Node a) => Context -> ArchiveEdge -> Proxy a -> Addr a -> SetResp -> IO ()
-addEdgeResp ctx archive = addSetResp ctx (Src.AEdge archive) (Src.StEdge SeSet)
-
-addCollectionResp :: (Node a) => Context -> ArchiveCollection -> Proxy a -> Addr a -> SetResp -> IO ()
-addCollectionResp ctx archive = addSetResp ctx (Src.ACollection archive) Src.StCollection
+      req.erRequest
+  addArchiveEdge ctx req.erMeta req.erEdge req.erFull ids
 
 addEntry :: Context -> LBS.ByteString -> IO ()
 addEntry ctx bs =
@@ -281,19 +264,17 @@ addEntry ctx bs =
                   }
 
           case ty of
-            AnBlog _ bt ->
+            AnBlog _ (NcChild bt) ->
               case bt of
-                AnCategory _ -> addNodeResp @Api.Category ctx Proxy nodeResp
-                AnComment _ -> addNodeResp @Api.Comment ctx Proxy nodeResp
-                AnMedia _ -> addNodeResp @Api.Media ctx Proxy nodeResp
-                AnPage _ -> addNodeResp @Api.Page ctx Proxy nodeResp
-                AnPageRevision _ _ -> addNodeResp @Api.PageRevision ctx Proxy nodeResp
-                AnPost _ -> addNodeResp @Api.Post ctx Proxy nodeResp
-                AnPostRevision _ _ -> addNodeResp @Api.PostRevision ctx Proxy nodeResp
-                AnTag _ -> addNodeResp @Api.Tag ctx Proxy nodeResp
-            AnUser _ ->
+                BcnCategory _ _ -> addNodeResp @Api.Category ctx Proxy nodeResp
+                BcnComment _ _ -> addNodeResp @Api.Comment ctx Proxy nodeResp
+                BcnMedia _ _ -> addNodeResp @Api.Media ctx Proxy nodeResp
+                BcnPage _ _ -> addNodeResp @Api.Page ctx Proxy nodeResp
+                BcnPost _ _ -> addNodeResp @Api.Post ctx Proxy nodeResp
+                BcnTag _ _ -> addNodeResp @Api.Tag ctx Proxy nodeResp
+            AnUser _ _ ->
               addNodeResp @Api.User ctx Proxy nodeResp
-        Src.RdEdge {Src.rdeType = ty, Src.rdeFull = full, Src.rdeResponses = resps} -> do
+        Src.RdEdge {Src.rdeType = ty@(ArchiveEdge edge), Src.rdeFull = full, Src.rdeResponses = resps} -> do
           let timestamp = (V.head resps).hrRequest.reqTimestamp
           rId <-
             V.imapM (addHttpResponse ctx entry.arSeq) resps >>= \hIds ->
@@ -312,50 +293,27 @@ addEntry ctx bs =
                         }
                   }
           let setResp =
-                SetResp
-                  { srMeta = NodeMeta {nmApiResponseId = rId, nmApi = entry.arApi, nmTimestamp = timestamp},
-                    srFull = full,
-                    srRequest = resps
+                EdgeResp
+                  { erEdge = ty,
+                    erMeta = NodeMeta {nmApiResponseId = rId, nmApi = entry.arApi, nmTimestamp = timestamp},
+                    erFull = full,
+                    erRequest = resps
                   }
-          case ty of
-            AeBlog addr et -> case et of
-              AePage _ APageRevision -> addEdgeResp @Api.PageRevision ctx ty Proxy addr setResp
-              AePost _ pe -> case pe of
-                APostComment -> addEdgeResp @Api.Comment ctx ty Proxy addr setResp
-                APostRevision -> addEdgeResp @Api.PostRevision ctx ty Proxy addr setResp
-        Src.RdCollection {Src.rdcType = ty, Src.rdcFull = full, Src.rdcResponses = resps} -> do
-          let timestamp = (V.head resps).hrRequest.reqTimestamp
-          rId <-
-            V.imapM (addHttpResponse ctx entry.arSeq) resps >>= \hIds ->
-              addApiResponse
-                ctx
-                Src.ApiResponseInfo
-                  { Src.arFetch = ctx.ctxFetchId,
-                    Src.arTimestamp = timestamp,
-                    Src.arSeq = entry.arSeq,
-                    Src.arApi = entry.arApi,
-                    Src.arResponse =
-                      Src.RdCollection
-                        { Src.rdcType = ty,
-                          Src.rdcFull = full,
-                          Src.rdcResponses = hIds
-                        }
-                  }
-          let setResp =
-                SetResp
-                  { srMeta = NodeMeta {nmApiResponseId = rId, nmApi = entry.arApi, nmTimestamp = timestamp},
-                    srFull = full,
-                    srRequest = resps
-                  }
-          case ty of
-            AcBlog addr bc -> case bc of
-              AcCategory -> addCollectionResp @Api.Category ctx ty Proxy addr setResp
-              AcComment -> addCollectionResp @Api.Comment ctx ty Proxy addr setResp
-              AcMedia -> addCollectionResp @Api.Media ctx ty Proxy addr setResp
-              AcPage -> addCollectionResp @Api.Media ctx ty Proxy addr setResp
-              AcPost -> addCollectionResp @Api.Post ctx ty Proxy addr setResp
-              AcTag -> addCollectionResp @Api.Tag ctx ty Proxy addr setResp
-            AcUser -> addCollectionResp @Api.User ctx ty Proxy () setResp
+          case edge of
+            EbChild (AceBlog addr et) ->
+              case et of
+                EbChild e -> case e of
+                  BcePost _ (ElEdge APostComment) ->
+                    addEdgeResp @Api.Comment ctx Proxy addr setResp
+                EbEdge e -> case e of
+                  BeCategory -> addEdgeResp @Api.Category ctx Proxy addr setResp
+                  BeComment -> addEdgeResp @Api.Comment ctx Proxy addr setResp
+                  BeMedia -> addEdgeResp @Api.Media ctx Proxy addr setResp
+                  BePage -> addEdgeResp @Api.Media ctx Proxy addr setResp
+                  BePost -> addEdgeResp @Api.Post ctx Proxy addr setResp
+                  BeTag -> addEdgeResp @Api.Tag ctx Proxy addr setResp
+            EbEdge e -> case e of
+              AseUser -> addEdgeResp @Api.User ctx Proxy () setResp
 
 withDataStore :: FilePath -> FilePath -> (BlobStore -> IO c) -> IO c
 withDataStore root serverRoot f =
