@@ -111,6 +111,7 @@ impl Client {
             method: req.method().clone().into(),
             url: req.url().as_str().to_string(),
             timestamp: Timestamp::now(),
+            headers: (),
             body: (),
         };
         tracing::info!(
@@ -186,6 +187,7 @@ impl Client {
             timestamp: Timestamp::now(),
             method: req.method().clone().into(),
             url: req.url().as_str().to_string(),
+            headers: (),
             body: (),
         };
         tracing::info!(

@@ -94,11 +94,12 @@ deriveSumData
   defaultSumOptions {constructorTagModifier = camelTo2 '-' . drop 3}
   ''RequestId
 
-data Request i b = Request
+data Request i h b = Request
   { reqId :: i,
     reqMethod :: Method,
     reqUrl :: Text,
     reqTimestamp :: Timestamp,
+    reqHeaders :: h,
     reqBody :: b
   }
   deriving (Show)

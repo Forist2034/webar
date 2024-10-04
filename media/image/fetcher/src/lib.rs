@@ -42,8 +42,8 @@ struct Context {
 }
 
 struct FetchData {
-    request: http::Request<RequestId, String, ()>,
-    response: http::Response<(), http::HeaderMap<http::HeaderValue>, ImageData<Vec<u8>>>,
+    request: http::Request<RequestId, String, (), ()>,
+    response: http::Response<(), ImageData<Vec<u8>>>,
 }
 
 #[tracing::instrument(skip(client), err)]
@@ -56,6 +56,7 @@ async fn fetch_data(client: &Client, url: String) -> Result<FetchData> {
         method: reqwest::Method::GET.into(),
         url,
         timestamp: Timestamp::now(),
+        headers: (),
         body: (),
     };
     tracing::info!("sending request");

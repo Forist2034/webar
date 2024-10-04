@@ -19,8 +19,8 @@ pub enum RequestId {
     XRequestId(Uuid),
 }
 
-pub type Request<U> = http::Request<RequestId, U, ()>;
-pub type Response<B> = http::Response<(), http::HeaderMap<http::HeaderValue>, B>;
+pub type Request<U> = http::Request<RequestId, U, (), ()>;
+pub type Response<B> = http::Response<(), B>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpInfo<U> {

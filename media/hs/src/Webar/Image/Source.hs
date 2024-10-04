@@ -36,7 +36,7 @@ deriveSumData
     }
   ''RequestId
 
-type Request = H.Request RequestId ()
+type Request = H.Request RequestId () ()
 
 type Response = H.Response () (BlobId ImageData)
 

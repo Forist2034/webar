@@ -199,7 +199,7 @@ deriveSumData
     }
   ''ResponseId
 
-type Request = H.Request H.RequestId ()
+type Request = H.Request H.RequestId () ()
 
 type Response = H.Response (Maybe ResponseId)
 

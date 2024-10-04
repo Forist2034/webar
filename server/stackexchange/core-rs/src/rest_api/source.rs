@@ -160,8 +160,8 @@ pub enum ResponseId {
     XRequestGuid(Uuid),
 }
 
-pub type Request<U> = http::Request<RequestId, U, ()>;
-pub type Response<H, B> = http::Response<Option<ResponseId>, H, B>;
+pub type Request<U> = http::Request<RequestId, U, (), ()>;
+pub type Response<B> = http::Response<Option<ResponseId>, B>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResponseData<S, R> {

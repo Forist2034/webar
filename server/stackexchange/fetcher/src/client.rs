@@ -71,6 +71,7 @@ impl Client {
             method: reqwest::Method::GET.into(),
             url: req.url().to_string(),
             timestamp: Timestamp::now(),
+            headers: (),
             body: (),
         };
         tracing::info!(

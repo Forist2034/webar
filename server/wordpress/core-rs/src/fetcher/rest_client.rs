@@ -5,7 +5,7 @@ use webar_data::{bytes::ByteBuf, ser::Serialize};
 
 use crate::rest_api::{source, ApiInfo};
 
-pub type RequestMeta = http::RequestMeta<source::RequestId, ()>;
+pub type RequestMeta = http::RequestMeta<source::RequestId, (), ()>;
 
 pub type ResponseMeta = http::ResponseMeta<()>;
 
@@ -26,6 +26,7 @@ impl HttpRequest {
             request: RequestMeta {
                 id: self.request.id.clone(),
                 timestamp: self.request.timestamp,
+                headers: (),
                 body: (),
             },
             response: ResponseMeta {

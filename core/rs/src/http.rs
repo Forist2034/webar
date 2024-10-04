@@ -172,25 +172,23 @@ pub enum RequestId {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RequestMeta<I, B> {
+pub struct RequestMeta<I, H, B> {
     pub id: I,
     pub timestamp: Timestamp,
+    /// headers is recorded in meta because [Request] may not contain full
+    /// request header
+    pub headers: H,
     /// metadata of body
     pub body: B,
 }
 
-/** http request
-
-  Request headers is not included because it is difficult to
-  get full headers and only include partial header is not reproducible.
-  So if request headers is needed, use specific type.
-*/
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Request<I, U, B> {
+pub struct Request<I, U, H, B> {
     pub id: I,
     pub method: Method,
     pub url: U,
     pub timestamp: Timestamp,
+    pub headers: H,
     pub body: B,
 }
 
@@ -201,10 +199,10 @@ pub struct ResponseMeta<I> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Response<I, H, B> {
+pub struct Response<I, B> {
     pub id: I,
     pub timestamp: Timestamp,
     pub status: StatusCode,
-    pub headers: H,
+    pub headers: HeaderMap<HeaderValue>,
     pub body: B,
 }

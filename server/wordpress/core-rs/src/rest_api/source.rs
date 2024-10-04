@@ -104,8 +104,8 @@ pub struct ArchiveEdge<Addr>(pub EdgeBranch<ArchiveSelfEdge, ArchiveChildEdge<Ad
 
 pub use http::RequestId;
 
-pub type Request<U> = http::Request<RequestId, U, ()>;
-pub type Response<B> = http::Response<(), http::HeaderMap<http::HeaderValue>, B>;
+pub type Request<U> = http::Request<RequestId, U, (), ()>;
+pub type Response<B> = http::Response<(), B>;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ResponseData<Addr, R> {
