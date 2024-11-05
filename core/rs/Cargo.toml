@@ -8,13 +8,18 @@ license.workspace = true
 
 [dependencies]
 serde.workspace = true
+ciborium-io = "0.2.2"
+ciborium-ll = "0.2.2"
+thiserror.workspace = true
 phf.workspace = true
 const-hex = { workspace = true, features = ["serde"] }
 webar-data.workspace = true
 sha2.workspace = true
 uuid.workspace = true
 http = "1.1.0"
+webar-core-derive = { path = "../derive-rs" }
 
 [dev-dependencies]
+paste = "1.0.15"
 ciborium.workspace = true
 hex-literal.workspace = true

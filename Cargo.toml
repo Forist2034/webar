@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "./data/derive-rs",
   "./data/data-rs",
+  "core/derive-rs",
   "./core/rs",
   "./store/rs",
   "./utils/rs/rustls",

@@ -4,6 +4,12 @@ use serde::Deserialize;
 
 use webar_data::ser::Serialize;
 
+pub mod bytes;
+
+pub mod codec {
+    pub mod cbor;
+}
+
 pub mod digest;
 
 pub mod http;
