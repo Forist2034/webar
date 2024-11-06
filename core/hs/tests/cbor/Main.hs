@@ -378,6 +378,11 @@ mixedSum = describe "mixed" do
   mkTest "unary" (MvNewt (-10)) "var_mv_newt"
   mkTest "record" MvStruct {mvsC = -1, mvsAc = True, mvsAb = "a"} "var_mv_struct"
 
+maybeTests :: Spec
+maybeTests = describe "maybe" do
+  mkTest "nothing" (Nothing @Word8) "none"
+  mkTest "just_0_u8" (Just @Word8 0) "some_0_u8"
+
 setTests :: Spec
 setTests = describe "set" do
   mkTest @(S.Set Int32) "empty" S.empty "set_empty"
@@ -391,10 +396,15 @@ mapTests = describe "map" do
 uuidTests :: Spec
 uuidTests = describe "uuid" do
   mkTest "nil" UUID.nil "uuid_nil"
-  mkTest "1" (UUID.fromWords64 0xc2cc_10e1_57d6_4b6f 0x9899_38d9_7211_2d8c) "uuid_1"
+  mkTest "sample" (UUID.fromWords64 0xc2cc_10e1_57d6_4b6f 0x9899_38d9_7211_2d8c) "uuid_1"
+  mkTest "max" (UUID.fromWords64 0xffff_ffff_ffff_ffff 0xffff_ffff_ffff_ffff) "uuid_max"
+  -- from rfc 9562
+  mkTest "v4" (UUID.fromWords64 0x9191_08f7_52d1_3320 0x5bac_f847_db41_48a8) "uuid_v4"
+  mkTest "v7" (UUID.fromWords64 0x017f_22e2_79b0_7cc3 0x98c4_dc0c_0c07_398f) "uuid_v7"
 
 main :: IO ()
 main = hspec do
+  mkTest "unit" () "null"
   integer
   text
   array
@@ -414,6 +424,7 @@ main = hspec do
     normalSum
     unarySum
     mixedSum
+  maybeTests
   setTests
   mapTests
   uuidTests
