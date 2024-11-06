@@ -15,8 +15,6 @@ extra-source-files:
 library
     exposed-modules:
         Webar.Codec.Cbor
-        Webar.Codec.Cbor.Encoding
-        Webar.Codec.Cbor.Decoding
         Webar.Codec.Cbor.TH
         Webar.Digest
         Webar.Types
@@ -29,7 +27,11 @@ library
         Webar.Blob
 
     hs-source-dirs:     src
-    other-modules:      Webar.Blob.Internal
+    other-modules:
+        Webar.Blob.Internal
+        Webar.Codec.Cbor.Internal.Encoding
+        Webar.Codec.Cbor.Internal.Decoding
+
     default-language:   Haskell2010
     default-extensions: StrictData
     ghc-options:        -Wall

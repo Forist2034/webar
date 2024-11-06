@@ -26,8 +26,8 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Language.Haskell.TH
 import Language.Haskell.TH.Syntax
-import Webar.Codec.Cbor.Decoding
-import Webar.Codec.Cbor.Encoding
+import Webar.Codec.Cbor.Internal.Decoding
+import Webar.Codec.Cbor.Internal.Encoding
 
 newtype ProductOptions = ProductOptions
   { fieldLabelModifier :: String -> String
