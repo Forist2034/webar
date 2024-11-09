@@ -24,6 +24,7 @@ import System.FilePath ((<.>), (</>))
 import Test.Hspec
 import Webar.Codec.Cbor
 import Webar.Codec.Cbor.TH
+import Webar.Time (TimePeriod (TimePeriod), mkTestTimestamp)
 import Webar.Types (Server (Server), Version (Version))
 
 mkTestBin :: (Show a, Eq a, ToCbor a, FromCbor a) => String -> a -> BS.ByteString -> Spec
@@ -401,6 +402,25 @@ uuidTests = describe "uuid" do
   mkTest "v4" (UUID.fromWords64 0x9191_08f7_52d1_3320 0x5bac_f847_db41_48a8) "uuid_v4"
   mkTest "v7" (UUID.fromWords64 0x017f_22e2_79b0_7cc3 0x98c4_dc0c_0c07_398f) "uuid_v7"
 
+timeTests :: Spec
+timeTests = describe "time" do
+  describe "Timestamp" do
+    mkTest
+      "with_uncertainty"
+      (mkTestTimestamp 1697724754 873294000 (Just (0, 1000)))
+      "timestamp_uncertainty"
+    mkTest
+      "no_uncertainty"
+      (mkTestTimestamp 1697724754 873294000 Nothing)
+      "timestamp_no_uncertainty"
+  mkTest
+    "TimePeriod"
+    ( TimePeriod
+        (mkTestTimestamp 1697724754 873294000 (Just (0, 1)))
+        (mkTestTimestamp 1697724755 0 (Just (0, 1)))
+    )
+    "period_sample"
+
 main :: IO ()
 main = hspec do
   mkTest "unit" () "null"
@@ -427,5 +447,6 @@ main = hspec do
   setTests
   mapTests
   uuidTests
+  timeTests
   mkTest "Version" (Version 1 0) "version_0"
   mkTest "Server" (Server "example" (Version 16 64)) "server_0"

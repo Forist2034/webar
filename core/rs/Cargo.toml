@@ -17,6 +17,7 @@ webar-data.workspace = true
 sha2.workspace = true
 uuid.workspace = true
 http = "1.1.0"
+rustix = { workspace = true, features = ["time"] }
 webar-core-derive = { path = "../derive-rs" }
 
 [dev-dependencies]

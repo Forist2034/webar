@@ -25,6 +25,7 @@ library
         Webar.Bytes
         Webar.Object
         Webar.Blob
+        Webar.Time
 
     hs-source-dirs:     src
     other-modules:

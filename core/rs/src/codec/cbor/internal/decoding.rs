@@ -42,7 +42,7 @@ impl<'a> Read for Reader<'a> {
 }
 
 #[derive(Debug, thiserror::Error)]
-enum InnerError<E> {
+pub(crate) enum InnerError<E> {
     #[error("cbor error")]
     Cbor(#[source] ciborium_ll::Error<E>),
     #[error("{ty}: header type mismatch {actual:?}")]
@@ -89,7 +89,7 @@ impl<E> Error<E> {
             actual: h,
         })
     }
-    fn io(source: E) -> Self {
+    pub(crate) fn io(source: E) -> Self {
         Self::from(InnerError::Cbor(ciborium_ll::Error::Io(source)))
     }
 
@@ -180,7 +180,7 @@ pub enum Enum<'t, 'd, R: Read> {
     Struct(&'t str, usize, StructVariantDecoder<'d, R>),
 }
 
-pub struct Decoder<'a, R: Read>(pub(in crate::codec::cbor) &'a mut ciborium_ll::Decoder<R>);
+pub struct Decoder<'a, R: Read>(pub(crate) &'a mut ciborium_ll::Decoder<R>);
 impl<'a, R: Read> Decoder<'a, R> {
     fn decode_unsigned<T: TryFrom<u64>>(self) -> Result<T, Error<R::Error>> {
         match self.0.pull().map_err(InnerError::Cbor)? {

@@ -14,7 +14,7 @@ use super::{TypeInfo, ENUM_TAG, UUID_TAG};
 #[derive(Debug, thiserror::Error)]
 pub struct Error<E>(#[from] pub(in crate::codec::cbor) E);
 
-pub struct Encoder<'a, W: Write>(pub(in crate::codec::cbor) &'a mut ciborium_ll::Encoder<W>);
+pub struct Encoder<'a, W: Write>(pub(crate) &'a mut ciborium_ll::Encoder<W>);
 impl<'a, W: Write> Encoder<'a, W> {
     pub fn encode_tuple_struct(
         self,

@@ -17,6 +17,8 @@ pub mod http;
 
 pub mod blob;
 
+pub mod time;
+
 pub mod object;
 
 pub mod fetch;
