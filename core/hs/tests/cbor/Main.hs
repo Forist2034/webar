@@ -24,6 +24,7 @@ import System.FilePath ((<.>), (</>))
 import Test.Hspec
 import Webar.Codec.Cbor
 import Webar.Codec.Cbor.TH
+import Webar.Types (Server (Server), Version (Version))
 
 mkTestBin :: (Show a, Eq a, ToCbor a, FromCbor a) => String -> a -> BS.ByteString -> Spec
 mkTestBin name v bin =
@@ -280,9 +281,7 @@ data SumUnit
   deriving (Show, Eq)
 
 deriveSumCbor
-  defaultSumOptions
-    { constructorTagModifier = camelTo2 '_' . drop 2
-    }
+  defaultSumOptions {constructorTagModifier = camelTo2 '_' . drop 2}
   ''SumUnit
 
 unitSum :: Spec
@@ -428,3 +427,5 @@ main = hspec do
   setTests
   mapTests
   uuidTests
+  mkTest "Version" (Version 1 0) "version_0"
+  mkTest "Server" (Server "example" (Version 16 64)) "server_0"

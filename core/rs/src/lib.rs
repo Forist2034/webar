@@ -1,5 +1,6 @@
-use std::{fmt::Display, time::SystemTime};
+use std::{any::type_name, fmt::Display, time::SystemTime};
 
+use codec::cbor::internal::{decoding, encoding};
 use serde::Deserialize;
 
 use webar_data::ser::Serialize;
@@ -47,6 +48,25 @@ impl Display for Version {
         write!(f, "{}.{}", self.0, self.1)
     }
 }
+impl encoding::ToCbor for Version {
+    fn encode<'a, W: ciborium_io::Write>(
+        &self,
+        encoder: encoding::Encoder<'a, W>,
+    ) -> Result<(), encoding::Error<W::Error>> {
+        let mut enc = encoder.encode_tuple_struct(type_name::<Self>(), 2)?;
+        enc.encode_field(&self.0)?;
+        enc.encode_field(&self.1)?;
+        enc.end()
+    }
+}
+impl<R: decoding::Read> decoding::FromCbor<R> for Version {
+    fn decode<'a>(
+        decoder: decoding::Decoder<'a, R>,
+    ) -> Result<Self, decoding::Error<<R as ciborium_io::Read>::Error>> {
+        let mut dec = decoder.decode_tuple_struct_len(type_name::<Self>(), 2)?;
+        Ok(Self(dec.next_field()?, dec.next_field()?))
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub struct Server<N> {
@@ -60,6 +80,28 @@ impl<N: Serialize> Serialize for Server<N> {
         ser.serialize_field(&self.name)?;
         ser.serialize_field(&self.version)?;
         ser.end()
+    }
+}
+impl<N: encoding::ToCbor> encoding::ToCbor for Server<N> {
+    fn encode<'a, W: ciborium_io::Write>(
+        &self,
+        encoder: codec::cbor::internal::encoding::Encoder<'a, W>,
+    ) -> Result<(), codec::cbor::internal::encoding::Error<W::Error>> {
+        let mut enc = encoder.encode_tuple_struct(type_name::<Self>(), 2)?;
+        enc.encode_field(&self.name)?;
+        enc.encode_field(&self.version)?;
+        enc.end()
+    }
+}
+impl<R: decoding::Read, N: decoding::FromCbor<R>> decoding::FromCbor<R> for Server<N> {
+    fn decode<'a>(
+        decoder: decoding::Decoder<'a, R>,
+    ) -> Result<Self, decoding::Error<<R as ciborium_io::Read>::Error>> {
+        let mut dec = decoder.decode_tuple_struct_len(type_name::<Self>(), 2)?;
+        Ok(Self {
+            name: dec.next_field()?,
+            version: dec.next_field()?,
+        })
     }
 }
 

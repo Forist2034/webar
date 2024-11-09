@@ -1,6 +1,9 @@
 use std::fmt::Debug;
 
-use webar_core::codec::cbor::{from_slice, to_vec, DecodeSlice, ToCbor};
+use webar_core::{
+    codec::cbor::{from_slice, to_vec, DecodeSlice, ToCbor},
+    Server, Version,
+};
 
 fn test_success<T: Debug + Eq + ToCbor + DecodeSlice>(v: T, bin: &[u8]) {
     assert_eq!(to_vec(&v), bin, "encode");
@@ -340,4 +343,19 @@ mod uuid {
     fn max() {
         test_success(Uuid::max(), include_bytes!("./data/uuid_max.bin"))
     }
+}
+
+#[test]
+fn version() {
+    test_success(Version(1, 0), include_bytes!("./data/version_0.bin"))
+}
+#[test]
+fn server() {
+    test_success(
+        Server {
+            name: String::from("example"),
+            version: Version(16, 64),
+        },
+        include_bytes!("./data/server_0.bin"),
+    )
 }
